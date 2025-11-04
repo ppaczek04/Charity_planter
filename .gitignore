@@ -82,3 +82,4 @@ dependencies.lock
 # --- system / OS śmieci ---
 .DS_Store
 Thumbs.db
+/.metadata/

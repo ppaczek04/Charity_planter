@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  mosquitto:
+    image: eclipse-mosquitto
+    container_name: mosquitto
+    ports: ["1883:1883"]
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  plantpot-backend:
+    build: .
+    container_name: plantpot-backend
+    depends_on: [mosquitto]
+    environment:
+      - MQTT_BROKER=tcp://mosquitto:1883
+      - MQTT_CLIENT_ID=plantpot-listener
+      - MQTT_TOPIC=iot/plantpot-1/tele
+    ports: ["8080:8080"]
