@@ -16,10 +16,10 @@
 // -------------------------------------------------------------
 // 🔹 Ustawienia sieci Wi-Fi i MQTT
 // -------------------------------------------------------------
-#define EXAMPLE_ESP_WIFI_SSID  "Cinderella"    // nazwa hotspotu (SSID)
+#define EXAMPLE_ESP_WIFI_SSID  "realme8"    // nazwa hotspotu (SSID)
 #define EXAMPLE_ESP_WIFI_PASS  "12345678"      // hasło do Wi-Fi
 #define LED_PIN                2               // pin LED (GPIO2 na ESP32)
-#define LAPTOP_IP              "172.19.107.49" // adres IP laptopa z brokerem MQTT (np. Docker z Mosquitto)
+#define LAPTOP_IP              "10.179.173.7" // adres IP laptopa z brokerem MQTT (np. Docker z Mosquitto)
 
 // -------------------------------------------------------------
 // 🔹 Definicje flag i obiektów FreeRTOS do obsługi połączeń

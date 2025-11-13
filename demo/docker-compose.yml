@@ -14,5 +14,5 @@ services:
     environment:
       - MQTT_BROKER=tcp://mosquitto:1883
       - MQTT_CLIENT_ID=plantpot-listener
-      - MQTT_TOPIC=iot/plantpot-1/tele
+      - MQTT_TOPIC=esp32/test
     ports: ["8080:8080"]

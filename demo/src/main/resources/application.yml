@@ -1,5 +1,5 @@
 mqtt:
-  broker: tcp://172.19.107.49   # w docker-compose nazwa serwisu brokera to "mosquitto"
+  broker: tcp://10.179.173.7   # w docker-compose nazwa serwisu brokera to "mosquitto"
   clientId: esp32_01
   topic: esp32/test
 server:
