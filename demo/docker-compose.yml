@@ -14,5 +14,5 @@ services:
     environment:
       - MQTT_BROKER=tcp://mosquitto:1883
       - MQTT_CLIENT_ID=plantpot-listener
-      - MQTT_TOPIC=esp32/test
+      - MQTT_TOPIC=sensors/esp32_1/soil
     ports: ["8080:8080"]

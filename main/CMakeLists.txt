@@ -4,5 +4,5 @@ idf_component_register(
         "http_get_task.c"
         "wifi_ap.c"
     INCLUDE_DIRS "."
-    REQUIRES mqtt esp_wifi esp_event nvs_flash driver
+    REQUIRES esp_wifi esp_event nvs_flash esp_system esp_netif mqtt driver esp_adc
 )
