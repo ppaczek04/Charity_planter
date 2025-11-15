@@ -11,59 +11,30 @@ menu "Example Configuration"
         default "mypassword"
         help
             WiFi password (WPA or WPA2) for the example to use.
-
-    choice ESP_WIFI_SAE_MODE
-        prompt "WPA3 SAE mode selection"
-        default ESP_STATION_EXAMPLE_WPA3_SAE_PWE_BOTH
+    config ESP_WIFI_CHANNEL
+        int "WiFi Channel"
+        range 1 13
+        default 1
         help
-            Select mode for SAE as Hunt and Peck, H2E or both.
-        config ESP_STATION_EXAMPLE_WPA3_SAE_PWE_HUNT_AND_PECK
-            bool "HUNT AND PECK"
-        config ESP_STATION_EXAMPLE_WPA3_SAE_PWE_HASH_TO_ELEMENT
-            bool "H2E"
-            depends on ESP_WIFI_ENABLE_SAE_H2E
-        config ESP_STATION_EXAMPLE_WPA3_SAE_PWE_BOTH
-            bool "BOTH"
-            depends on ESP_WIFI_ENABLE_SAE_H2E
-    endchoice
+            WiFi channel (network channel) for the example to use.
 
-    config ESP_WIFI_PW_ID
-        string "PASSWORD IDENTIFIER"
-        depends on  ESP_STATION_EXAMPLE_WPA3_SAE_PWE_HASH_TO_ELEMENT|| ESP_STATION_EXAMPLE_WPA3_SAE_PWE_BOTH
-        default ""
+    config ESP_MAX_STA_CONN
+        int "Maximal STA connections"
+        default 4
         help
-            password identifier for SAE H2E
+            Max number of the STA connects to AP.
 
-    config ESP_MAXIMUM_RETRY
-        int "Maximum retry"
-        default 5
+    config ESP_GTK_REKEYING_ENABLE
+        bool "Enable GTK Rekeying"
+        default y
         help
-            Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
+            Flag to enable GTK rekeying.
 
-    choice ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD
-        prompt "WiFi Scan auth mode threshold"
-        default ESP_WIFI_AUTH_WPA2_PSK
+    config ESP_GTK_REKEY_INTERVAL
+        int "GTK rekey interval"
+        depends on ESP_GTK_REKEYING_ENABLE
+        range 60 65535
+        default 600
         help
-            The weakest authmode to accept in the scan mode.
-            This value defaults to ESP_WIFI_AUTH_WPA2_PSK in case password is present and ESP_WIFI_AUTH_OPEN is used.
-            Please select ESP_WIFI_AUTH_WEP/ESP_WIFI_AUTH_WPA_PSK in case AP is operating in WEP/WPA mode.
-
-        config ESP_WIFI_AUTH_OPEN
-            bool "OPEN"
-        config ESP_WIFI_AUTH_WEP
-            bool "WEP"
-        config ESP_WIFI_AUTH_WPA_PSK
-            bool "WPA PSK"
-        config ESP_WIFI_AUTH_WPA2_PSK
-            bool "WPA2 PSK"
-        config ESP_WIFI_AUTH_WPA_WPA2_PSK
-            bool "WPA/WPA2 PSK"
-        config ESP_WIFI_AUTH_WPA3_PSK
-            bool "WPA3 PSK"
-        config ESP_WIFI_AUTH_WPA2_WPA3_PSK
-            bool "WPA2/WPA3 PSK"
-        config ESP_WIFI_AUTH_WAPI_PSK
-            bool "WAPI PSK"
-    endchoice
-
+            GTK rekeying interval in seconds.
 endmenu

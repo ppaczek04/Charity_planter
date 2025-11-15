@@ -1,38 +1,81 @@
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "esp_netif.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include <string.h>
 
-#define EXAMPLE_ESP_WIFI_SSID_AP      "ESP32_AP"
-#define EXAMPLE_ESP_WIFI_PASS_AP      "12345678"
-#define EXAMPLE_MAX_STA_CONN          4
+#include "lwip/err.h"
+#include "lwip/sys.h"
 
-static const char *TAG_AP = "wifi_ap";
+#define EXAMPLE_ESP_WIFI_SSID      "ESP32_AP"
+#define EXAMPLE_ESP_WIFI_PASS      "12345678"
+#define EXAMPLE_ESP_WIFI_CHANNEL   4
+#define EXAMPLE_MAX_STA_CONN       6
 
-void wifi_init_ap(void)
+#if CONFIG_ESP_GTK_REKEYING_ENABLE
+#define EXAMPLE_GTK_REKEY_INTERVAL CONFIG_ESP_GTK_REKEY_INTERVAL
+#else
+#define EXAMPLE_GTK_REKEY_INTERVAL 0
+#endif
+
+static const char *TAG = "wifi softAP";
+
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                                    int32_t event_id, void* event_data)
 {
-    // Inicjalizacja NVS i netif
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
+        ESP_LOGI(TAG, "station "MACSTR" join, AID=%d",
+                 MAC2STR(event->mac), event->aid);
+    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
+        ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d, reason=%d",
+                 MAC2STR(event->mac), event->aid, event->reason);
+    }
+}
 
-    // Tworzymy interfejs AP
+void wifi_init_softap(void)
+{
     esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    wifi_config_t wifi_config = {0};
-    strncpy((char *)wifi_config.ap.ssid, EXAMPLE_ESP_WIFI_SSID_AP, sizeof(wifi_config.ap.ssid));
-    wifi_config.ap.ssid_len = strlen(EXAMPLE_ESP_WIFI_SSID_AP);
-    strncpy((char *)wifi_config.ap.password, EXAMPLE_ESP_WIFI_PASS_AP, sizeof(wifi_config.ap.password));
-    wifi_config.ap.max_connection = EXAMPLE_MAX_STA_CONN;
-    wifi_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        NULL));
 
-    if (strlen(EXAMPLE_ESP_WIFI_PASS_AP) == 0) {
+    wifi_config_t wifi_config = {
+        .ap = {
+            .ssid = EXAMPLE_ESP_WIFI_SSID,
+            .ssid_len = strlen(EXAMPLE_ESP_WIFI_SSID),
+            .channel = EXAMPLE_ESP_WIFI_CHANNEL,
+            .password = EXAMPLE_ESP_WIFI_PASS,
+            .max_connection = EXAMPLE_MAX_STA_CONN,
+#ifdef CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT
+            .authmode = WIFI_AUTH_WPA3_PSK,
+            .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
+#else /* CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT */
+            .authmode = WIFI_AUTH_WPA2_PSK,
+#endif
+            .pmf_cfg = {
+                    .required = true,
+            },
+#ifdef CONFIG_ESP_WIFI_BSS_MAX_IDLE_SUPPORT
+            .bss_max_idle_cfg = {
+                .period = WIFI_AP_DEFAULT_MAX_IDLE_PERIOD,
+                .protected_keep_alive = 1,
+            },
+#endif
+            .gtk_rekey_interval = EXAMPLE_GTK_REKEY_INTERVAL,
+        },
+    };
+    if (strlen(EXAMPLE_ESP_WIFI_PASS) == 0) {
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
     }
 
@@ -40,7 +83,6 @@ void wifi_init_ap(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG_AP, "AP mode started. SSID:%s password:%s",
-             EXAMPLE_ESP_WIFI_SSID_AP, EXAMPLE_ESP_WIFI_PASS_AP);
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
+             EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS, EXAMPLE_ESP_WIFI_CHANNEL);
 }
-

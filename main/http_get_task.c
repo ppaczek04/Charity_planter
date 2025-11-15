@@ -3,18 +3,24 @@
 #include "lwip/netdb.h"       
 #include "sdkconfig.h"
 #include <stdbool.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "wifi_sta.h"
 
 #define WEB_SERVER "example.com"
 #define WEB_PORT 80
 
-extern bool wifi_connected;  
-
 void http_get_task(void *pvParameter)
 {
     // Czekamy na połączenie WiFi
-    while (!wifi_connected) {
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-    }
+    ESP_LOGI("HTTP", "Waiting for WiFi connection...");
+    xEventGroupWaitBits(s_wifi_event_group, 
+                        WIFI_CONNECTED_BIT,
+                        pdFALSE, 
+                        pdTRUE,  
+                        portMAX_DELAY);
+    ESP_LOGI("HTTP", "WiFi connected. Starting HTTP GET.");
 
     char request[256];
     int sock;

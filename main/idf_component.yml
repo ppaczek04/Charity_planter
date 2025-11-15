@@ -1,3 +1,4 @@
+## IDF Component Manager Manifest File
 dependencies:
   espressif/esp_wifi_remote:
     version: ">=0.10,<2.0"
