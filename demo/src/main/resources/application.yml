@@ -1,6 +1,24 @@
 mqtt:
-  broker: tcp://10.179.173.7   # w docker-compose nazwa serwisu brokera to "mosquitto"
+  broker: tcp://192.168.130.49   # w docker-compose nazwa serwisu brokera to "mosquitto"
   clientId: esp32_01
-  topic: esp32/test
+  topic: sensors/esp32_1/soil
 server:
   port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/planterdb;AUTO_SERVER=TRUE
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+

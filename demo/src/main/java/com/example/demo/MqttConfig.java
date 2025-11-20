@@ -1,5 +1,7 @@
 package com.example.demo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -55,26 +57,57 @@ public class MqttConfig {
         return new DirectChannel();
     }
 
-    @Bean
-    public MessageProducer inbound(MqttPahoClientFactory factory) {
-        MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(clientId, factory, topic);
-        adapter.setCompletionTimeout(5000);
-        adapter.setConverter(new DefaultPahoMessageConverter());
-        adapter.setQos(1);
-        adapter.setOutputChannel(mqttInputChannel());
-        return adapter;
-    }
 
     @Bean
     @ServiceActivator(inputChannel = "mqttInputChannel")
-    public MessageHandler handler(AtomicReference<String> lastRef) {
+    public MessageHandler handler(AtomicReference<String> lastRef,
+                                  SoilMeasurementRepository repository,
+                                  ObjectMapper objectMapper) {
+
         return message -> {
             String payload = String.valueOf(message.getPayload());
             lastRef.set(payload);
             System.out.println("[MQTT] ✅ Otrzymano wiadomość: " + payload);
+
+            try {
+                JsonNode node = objectMapper.readTree(payload);
+
+                // wyciągamy wilgotność procentową
+                int soilPercent = node.path("soil_percent").asInt();
+
+                SoilMeasurement measurement = new SoilMeasurement();
+                measurement.setMoisture(soilPercent);
+                // timestamp doda się sam w @PrePersist
+
+                repository.save(measurement);
+
+                System.out.println("[DB] 💾 Zapisano pomiar: " + soilPercent + " %");
+
+            } catch (Exception e) {
+                System.err.println("[MQTT] ❌ Błąd przy parsowaniu / zapisie do DB: " + e.getMessage());
+            }
         };
+
     }
+    @Bean
+    public MessageProducer inbound(MqttPahoClientFactory clientFactory,
+                                   @Value("${mqtt.topic}") String topic) {
+
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                new MqttPahoMessageDrivenChannelAdapter(
+                        "backend-subscriber",
+                        clientFactory,
+                        topic
+                );
+
+        adapter.setQos(1);
+        adapter.setConverter(new DefaultPahoMessageConverter());
+        adapter.setOutputChannel(mqttInputChannel()); // <-- WAŻNE
+        return adapter;
+    };
+
+
+
 }
 
 
