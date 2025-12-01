@@ -14,7 +14,7 @@
 /* --- KONFIGURACJA --- */
 #define WIFI_SSID        "A56Pio"
 #define WIFI_PASS        "siema123"
-#define MQTT_BROKER_URI  "mqtt://192.168.130.49:1883"   // IP twojego laptopa z Mosquitto
+#define MQTT_BROKER_URI  "mqtt://10.101.112.49:1883"   // IP twojego laptopa z Mosquitto
 #define TAG              "MQTT_SOIL"
 
 #define CZUJNIK_WILGOTNOSCI_CHANNEL ADC_CHANNEL_0  // GPIO36 (VP)

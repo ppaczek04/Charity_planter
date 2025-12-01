@@ -1,5 +1,5 @@
 mqtt:
-  broker: tcp://192.168.130.49   # w docker-compose nazwa serwisu brokera to "mosquitto"
+  broker: tcp://10.101.112.49   # w docker-compose nazwa serwisu brokera to "mosquitto"
   clientId: esp32_01
   topic: sensors/esp32_1/soil
 server:
@@ -21,4 +21,6 @@ spring:
     console:
       enabled: true
       path: /h2-console
+      settings:
+        web-allow-others: true
 
