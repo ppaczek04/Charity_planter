@@ -16,3 +16,6 @@ services:
       - MQTT_CLIENT_ID=plantpot-listener
       - MQTT_TOPIC=sensors/esp32_1/soil
     ports: ["8080:8080"]
+
+    volumes:
+      - ./data:/app/data

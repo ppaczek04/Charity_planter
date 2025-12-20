@@ -70,18 +70,28 @@ public class MqttConfig {
             System.out.println("[MQTT] ✅ Otrzymano wiadomość: " + payload);
 
             try {
+                // >>> ZMIANA - parsowanie nowych pól
                 JsonNode node = objectMapper.readTree(payload);
 
-                // wyciągamy wilgotność procentową
+                // wilgotność (jak było)
                 int soilPercent = node.path("soil_percent").asInt();
+
+                // temperatura i ciśnienie (mogą nie przyjść -> wtedy null)
+                Double temperature = node.has("temperature_c") ? node.get("temperature_c").asDouble() : null;
+                Double pressure = node.has("pressure_hpa") ? node.get("pressure_hpa").asDouble() : null;
 
                 SoilMeasurement measurement = new SoilMeasurement();
                 measurement.setMoisture(soilPercent);
-                // timestamp doda się sam w @PrePersist
+
+                // >>> ZMIANA - zapis nowych pól
+                measurement.setTemperature(temperature);
+                measurement.setPressure(pressure);
 
                 repository.save(measurement);
 
-                System.out.println("[DB] 💾 Zapisano pomiar: " + soilPercent + " %");
+                System.out.println("[DB] 💾 Zapisano pomiar: " + soilPercent + " %"
+                        + ", temp=" + temperature + " C"
+                        + ", pressure=" + pressure + " hPa");
 
             } catch (Exception e) {
                 System.err.println("[MQTT] ❌ Błąd przy parsowaniu / zapisie do DB: " + e.getMessage());
@@ -105,9 +115,6 @@ public class MqttConfig {
         adapter.setOutputChannel(mqttInputChannel()); // <-- WAŻNE
         return adapter;
     };
-
-
-
 }
 
 
