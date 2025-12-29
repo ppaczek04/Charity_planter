@@ -17,3 +17,10 @@ services:
     ports: ["8080:8080"]
     volumes:
       - ./backend/data:/app/data
+
+  plantpot-frontend:
+    build: ./frontend
+    container_name: plantpot-frontend
+    ports: ["3000:80"]
+    depends_on:
+      - plantpot-backend
