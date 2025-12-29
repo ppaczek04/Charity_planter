@@ -1,18 +1,22 @@
-mqtt:
-  broker: tcp://10.101.48.49   # w docker-compose nazwa serwisu brokera to "mosquitto"
-  clientId: esp32_01
-  topic: sensors/esp32_1/soil
 server:
   port: 8080
 
+mqtt:
+  broker: tcp://mosquitto:1883   # w docker-compose nazwa serwisu brokera to "mosquitto"
+  clientId: backend-client
+  topic: sensors/esp32_1/soil
+
 spring:
+  application:
+    name: plantpot-backend
   datasource:
-    url: jdbc:h2:file:./data/planterdb;AUTO_SERVER=TRUE
+    url: jdbc:h2:file:./data/plantpotdb;AUTO_SERVER=TRUE
     driverClassName: org.h2.Driver
     username: sa
     password:
 
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
       #ddl-auto: none
@@ -24,6 +28,3 @@ spring:
       path: /h2-console
       settings:
         web-allow-others: true
-
-
-

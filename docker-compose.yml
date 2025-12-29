@@ -12,9 +12,8 @@ services:
     container_name: plantpot-backend
     depends_on: [mosquitto]
     environment:
+      - SPRING_DATASOURCE_URL=jdbc:h2:file:/app/data/plantpotdb;AUTO_SERVER=TRUE
       - MQTT_BROKER=tcp://mosquitto:1883
-      - MQTT_CLIENT_ID=plantpot-listener
-      - MQTT_TOPIC=sensors/esp32_1/soil
     ports: ["8080:8080"]
     volumes:
       - ./backend/data:/app/data
