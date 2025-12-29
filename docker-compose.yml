@@ -8,7 +8,7 @@ services:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 
   plantpot-backend:
-    build: .
+    build: ./backend  
     container_name: plantpot-backend
     depends_on: [mosquitto]
     environment:
@@ -16,6 +16,5 @@ services:
       - MQTT_CLIENT_ID=plantpot-listener
       - MQTT_TOPIC=sensors/esp32_1/soil
     ports: ["8080:8080"]
-
     volumes:
-      - ./data:/app/data
+      - ./backend/data:/app/data
