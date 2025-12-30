@@ -11,6 +11,7 @@ import org.springframework.integration.core.MessageProducer;
 import org.springframework.integration.mqtt.core.DefaultMqttPahoClientFactory;
 import org.springframework.integration.mqtt.core.MqttPahoClientFactory;
 import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
+import org.springframework.integration.mqtt.outbound.MqttPahoMessageHandler;
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
@@ -84,6 +85,22 @@ public class MqttConfig {
             // Przekazujemy do serwisu
             service.processMessage(topic, payload);
         };
+    }
+
+    @Bean
+    public MessageChannel mqttOutboundChannel() {
+        return new DirectChannel();
+    }
+
+    // 2. Handler, który faktycznie wypycha wiadomości do brokera
+    @Bean
+    @ServiceActivator(inputChannel = "mqttOutboundChannel")
+    public MessageHandler mqttOutbound(MqttPahoClientFactory clientFactory) {
+        // "backend-sender" to ID klienta do wysyłania (musi być inne niż do odbierania)
+        MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler("backend-sender", clientFactory);
+        messageHandler.setAsync(true);
+        messageHandler.setDefaultTopic("default/topic");
+        return messageHandler;
     }
 }
 

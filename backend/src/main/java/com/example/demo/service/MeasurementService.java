@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.config.MqttGateway;
 import com.example.demo.model.*;
 import com.example.demo.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -48,15 +49,17 @@ public class MeasurementService {
     private final SoilHumidityRepository soilRepo;
     private final CoinEventRepository coinRepo;
     private final ObjectMapper objectMapper;
+    private final MqttGateway mqttGateway;
 
     public MeasurementService(TemperatureRepository tempRepo, PressureRepository pressRepo,
                               SoilHumidityRepository soilRepo, CoinEventRepository coinRepo,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper, MqttGateway mqttGateway) {
         this.tempRepo = tempRepo;
         this.pressRepo = pressRepo;
         this.soilRepo = soilRepo;
         this.coinRepo = coinRepo;
         this.objectMapper = objectMapper;
+        this.mqttGateway = mqttGateway;
     }
 
     public void processMessage(String topic, String payload) {
@@ -65,11 +68,21 @@ public class MeasurementService {
             String[] parts = topic.split("/");
             if (parts.length < 3) return;
 
+            String userMac = parts[0];
             String deviceMac = parts[1];
             String sensorType = parts[2]; // temperature, pressure, soil_humidity, coin_inserted
 
-            // Zakładamy, że payload to prosty JSON: {"value": 23.5}
+            if ("water".equals(sensorType)) {
+                return;
+            }
+
             JsonNode node = objectMapper.readTree(payload);
+
+            if (!node.has("value")) {
+                System.out.println("⚠️ Ignoruję wiadomość bez pola 'value' (Topic: " + topic + ")");
+                return;
+            }
+
             double value = node.get("value").asDouble();
 
             switch (sensorType) {
@@ -102,9 +115,19 @@ public class MeasurementService {
                     c.setValue(value);
                     c.setDeviceMac(deviceMac);
                     coinRepo.save(c);
-                    System.out.println("💰 Zapisano Monetę!");
-                    break;
+                    System.out.println(" Zapisano Monetę! Uruchamiam podlewanie...");
 
+                    // Budujemy temat odpowiedzi: user123/esp32_01/water
+                    String commandTopic = String.format("%s/%s/water", userMac, deviceMac);
+
+                    // Budujemy prosty JSON z rozkazem
+                    String commandPayload = "{\"command\": \"WATER_ON\", \"duration_sec\": 5}";
+
+                    // Wysyłamy przez bramkę
+                    mqttGateway.sendToMqtt(commandPayload, commandTopic);
+
+                    System.out.println("📤 Wysłano rozkaz na temat: " + commandTopic);
+                    break;
                 default:
                     System.out.println("⚠️ Nieznany typ sensora: " + sensorType);
             }
