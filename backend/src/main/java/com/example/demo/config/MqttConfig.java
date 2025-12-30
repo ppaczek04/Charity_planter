@@ -14,6 +14,7 @@ import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannel
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
+import org.springframework.integration.mqtt.support.MqttHeaders;
 
 @Configuration
 public class MqttConfig {
@@ -39,25 +40,49 @@ public class MqttConfig {
         return new DirectChannel();
     }
 
+//    @Bean
+//    public MessageProducer inbound(MqttPahoClientFactory clientFactory) {
+//        MqttPahoMessageDrivenChannelAdapter adapter =
+//                new MqttPahoMessageDrivenChannelAdapter("backend-subscriber", clientFactory, topic);
+//        adapter.setQos(1);
+//        adapter.setConverter(new DefaultPahoMessageConverter());
+//        adapter.setOutputChannel(mqttInputChannel());
+//        return adapter;
+//    }
+//
+//    // Tutaj wstrzykujemy nasz nowy MeasurementService!
+//    @Bean
+//    @ServiceActivator(inputChannel = "mqttInputChannel")
+//    public MessageHandler handler(MeasurementService measurementService) {
+//        return message -> {
+//            String payload = String.valueOf(message.getPayload());
+//            System.out.println("[MQTT] 📩 Wiadomość: " + payload);
+//            // Zlecamy pracę serwisowi
+//            measurementService.processAndSave(payload);
+//        };
+//    }
     @Bean
     public MessageProducer inbound(MqttPahoClientFactory clientFactory) {
+        // Nasłuchujemy na WSZYSTKO co ma 3 poziomy (user/device/sensor)
         MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter("backend-subscriber", clientFactory, topic);
+                new MqttPahoMessageDrivenChannelAdapter("backend-sub", clientFactory, "+/+/+");
+
         adapter.setQos(1);
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setOutputChannel(mqttInputChannel());
         return adapter;
     }
 
-    // Tutaj wstrzykujemy nasz nowy MeasurementService!
     @Bean
     @ServiceActivator(inputChannel = "mqttInputChannel")
-    public MessageHandler handler(MeasurementService measurementService) {
+    public MessageHandler handler(MeasurementService service) {
         return message -> {
+            // Wyciągamy temat z nagłówka wiadomości
+            String topic = (String) message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC);
             String payload = String.valueOf(message.getPayload());
-            System.out.println("[MQTT] 📩 Wiadomość: " + payload);
-            // Zlecamy pracę serwisowi
-            measurementService.processAndSave(payload);
+
+            // Przekazujemy do serwisu
+            service.processMessage(topic, payload);
         };
     }
 }
