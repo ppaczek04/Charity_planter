@@ -1,0 +1,18 @@
+2026-01-03 12:33:33.277213Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "TEMPRERATURES" not found; SQL statement:
+select * from tempreratures [42102-232]
+2026-01-03 12:33:46.476104Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "TEMPRERATURES" not found; SQL statement:
+select * from tempreratures [42102-232]
+2026-01-03 12:33:52.734978Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "TEMPRERATURES" not found; SQL statement:
+select * from tempreratures [42102-232]
+2026-01-03 12:48:28.506929Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "select * [*]temperatures"; SQL statement:
+select * temperatures [42000-232]
+2026-01-03 12:48:35.106191Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "select * [*]temperatures"; SQL statement:
+select * temperatures [42000-232]
+2026-01-03 12:48:40.581832Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "select * [*]temperatures"; SQL statement:
+select * temperatures [42000-232]
