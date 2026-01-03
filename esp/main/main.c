@@ -21,10 +21,10 @@
 /* --- KONFIGURACJA --- */
 #define WIFI_SSID        "A56Pio"
 #define WIFI_PASS        "siema123"
-#define MQTT_BROKER_URI  "mqtt://10.101.48.49:1883"   // IP twojego laptopa z Mosquitto
+#define MQTT_BROKER_URI  "mqtt://10.223.240.49:1883"   // IP twojego laptopa z Mosquitto
 #define TAG              "MQTT_SOIL"
 
-#define CZUJNIK_WILGOTNOSCI_CHANNEL ADC_CHANNEL_0  // GPIO36 (VP)
+#define CZUJNIK_WILGOTNOSCI_CHANNEL ADC_CHANNEL_6  // GPIO34
 
 
 // >>> ZMIANA (BMP280) - konfiguracja I2C
@@ -42,6 +42,13 @@ esp_mqtt_client_handle_t mqtt_client;
 static bmp280_t bmp_dev;
 static bool bmp_ok = false;
 ////
+
+
+#define TOPIC_SOIL        "sensors/esp32_1/soil"
+#define TOPIC_TEMPERATURE "sensors/esp32_1/temperature"
+#define TOPIC_PRESSURE    "sensors/esp32_1/pressure"
+
+
 
 /* --- Wi-Fi --- */
 static void wifi_init(void)
@@ -131,75 +138,98 @@ static void bmp280_setup(void)
 }
 ////
 
-/* --- Zadanie odczytu wilgotności gleby --- */
+static void mqtt_publish_value(const char *topic, float value)
+{
+    char payload[64];
+    snprintf(payload, sizeof(payload), "{\"value\": %.2f}", value);
+
+    esp_mqtt_client_publish(
+        mqtt_client,
+        topic,
+        payload,
+        0,
+        1,
+        0
+    );
+
+    ESP_LOGI("MQTT", "Wysłano → %s : %s", topic, payload);
+}
+
+
+
+//* --- Zadanie odczytu wilgotności gleby + BMP280 --- */
 static void soil_moisture_task(void *pvParameter)
 {
     adc_oneshot_unit_handle_t adc_handle;
     adc_oneshot_unit_init_cfg_t init_config = {
         .unit_id = ADC_UNIT_1,
     };
-    adc_oneshot_new_unit(&init_config, &adc_handle);
-    // ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
 
     adc_oneshot_chan_cfg_t config = {
-        .atten = ADC_ATTEN_DB_11,          // Zakres 0–3.3V
+        .atten = ADC_ATTEN_DB_11,          // 0–3.3V
         .bitwidth = ADC_BITWIDTH_DEFAULT,  // 12-bit
     };
-    adc_oneshot_config_channel(adc_handle, CZUJNIK_WILGOTNOSCI_CHANNEL, &config);
-    // ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, CZUJNIK_WILGOTNOSCI_CHANNEL, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(
+        adc_handle,
+        CZUJNIK_WILGOTNOSCI_CHANNEL,
+        &config
+    ));
 
     int raw_value;
-    // >>> ZMIANA (MQTT TEMP/PRESS) - większy bufor na JSON
-    char payload[160];
 
-    ESP_LOGI(TAG, "🌱 Start pomiarów: wilgotność + BMP280 (temp + ciśnienie)");
+    ESP_LOGI(TAG, "🌱 Start pomiarów: soil + temperature + pressure");
 
-	while (1) {
-		// --- Odczyt wilgotności (ADC) ---
-		ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, CZUJNIK_WILGOTNOSCI_CHANNEL, &raw_value));
+    while (1) {
 
-		// Prosta konwersja na procent (możesz później skalibrować "sucho/mokro")
-		int wilgotnosc_proc = 100 - (raw_value * 100 / 4095);
+        /* --- Odczyt wilgotności gleby --- */
+        ESP_ERROR_CHECK(
+            adc_oneshot_read(adc_handle,
+                             CZUJNIK_WILGOTNOSCI_CHANNEL,
+                             &raw_value)
+        );
 
-		// --- Odczyt BMP280 ---
-		float temp_c = 0.0f;
-		float pres_pa = 0.0f;
-		float pres_hpa = 0.0f;
-		bool bmp_read_ok = false;
+        int wilgotnosc_proc = 100 - (raw_value * 100 / 4095);
 
-		if (bmp_ok && (bmp280_read_float(&bmp_dev, &temp_c, &pres_pa) == ESP_OK)) {
-			pres_hpa = pres_pa / 100.0f;
-			bmp_read_ok = true;
+        /* --- Odczyt BMP280 --- */
+        float temp_c = 0.0f;
+        float pres_pa = 0.0f;
+        float pres_hpa = 0.0f;
+        bool bmp_read_ok = false;
 
-			ESP_LOGI(TAG, "🌱 %d%% | 🌡️ %.2f C | 🧭 %.2f hPa",
-					 wilgotnosc_proc, temp_c, pres_hpa);
-		} else {
-			ESP_LOGW(TAG, "⚠️ BMP280: brak odczytu (wysyłam tylko wilgotność)");
-			ESP_LOGI(TAG, "🌱 %d%%", wilgotnosc_proc);
-		}
+        if (bmp_ok && bmp280_read_float(&bmp_dev, &temp_c, &pres_pa) == ESP_OK) {
+            pres_hpa = pres_pa / 100.0f;
+            bmp_read_ok = true;
 
-		// --- Budowa JSON payload ---
-		if (bmp_read_ok) {
-			snprintf(payload, sizeof(payload),
-					 "{\"soil_raw\":%d,\"soil_percent\":%d,\"temperature_c\":%.2f,\"pressure_hpa\":%.2f}",
-					 raw_value, wilgotnosc_proc, temp_c, pres_hpa);
-		} else {
-			// fallback: bez temp/pressure
-			snprintf(payload, sizeof(payload),
-					 "{\"soil_raw\":%d,\"soil_percent\":%d}",
-					 raw_value, wilgotnosc_proc);
-		}
+            ESP_LOGI(TAG,
+                     "🌱 %d%% | 🌡️ %.2f C | 🧭 %.2f hPa",
+                     wilgotnosc_proc, temp_c, pres_hpa);
+        } else {
+            ESP_LOGW(TAG,
+                     "⚠️ BMP280: brak odczytu (wysyłam tylko soil)");
+            ESP_LOGI(TAG,
+                     "🌱 %d%%",
+                     wilgotnosc_proc);
+        }
 
-		// --- Publikacja MQTT ---
-		if (mqtt_client) {
-			esp_mqtt_client_publish(mqtt_client, "sensors/esp32_1/soil", payload, 0, 1, 0);
-			ESP_LOGI(TAG, "📤 Wysłano: %s", payload);
-		} else {
-			ESP_LOGW(TAG, "⚠️ mqtt_client == NULL (nie wysłano)");
-		}
+        /* --- Publikacja MQTT (ELEGANCKO) --- */
+        if (mqtt_client) {
 
-		vTaskDelay(pdMS_TO_TICKS(5000)); // co 5 sekund
-	}
+            mqtt_publish_value(TOPIC_SOIL, wilgotnosc_proc);
+
+            if (bmp_read_ok) {
+                mqtt_publish_value(TOPIC_TEMPERATURE, temp_c);
+                mqtt_publish_value(TOPIC_PRESSURE, pres_hpa);
+            }
+
+            ESP_LOGI(TAG, "📤 MQTT: soil / temperature / pressure wysłane");
+
+        } else {
+            ESP_LOGW(TAG, "⚠️ mqtt_client == NULL (nie wysłano)");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5000)); // co 5 sekund
+    }
 }
 
 /* --- main() --- */
