@@ -11,6 +11,7 @@
 
 static esp_mqtt_client_handle_t client = NULL;
 static bool is_connected = false;
+static bool s_mqtt_started = false;
 
 static char broker_url[64];
 static char username[32];
@@ -82,6 +83,7 @@ void mqtt_manager_init(void) {
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, event_handler, NULL);
     esp_mqtt_client_start(client);
+    s_mqtt_started = true;
 }
 
 static void publish_single_value(const char *sensor_type, double value, const char *unit) {
@@ -117,8 +119,6 @@ void mqtt_send_sensor_data(int soil, float temp, float press) {
         return;
     }
 
-    ESP_LOGI(TAG, "Wysyłanie danych z czujników...");
-
     publish_single_value("soil", (double)soil, "%");
     publish_single_value("temperature", (double)temp, "C");
     publish_single_value("pressure", (double)press, "hPa");
@@ -130,4 +130,18 @@ void mqtt_send_coin_event(void) {
 
 void set_water_command_callback(water_command_callback_t callback) {
     water_callback = callback;
+}
+
+void mqtt_stop_activity(void) {
+    if (client != NULL && s_mqtt_started) {
+        esp_mqtt_client_stop(client);
+        s_mqtt_started = false;
+    }
+}
+
+void mqtt_start_activity(void) {
+    if (client != NULL && !s_mqtt_started) {
+        esp_mqtt_client_start(client);
+        s_mqtt_started = true;
+    }
 }

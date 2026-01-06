@@ -1,95 +1,105 @@
-#include "nvs_flash.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-// Moduły
+#include "nvs.h"    
+#include "soil_sensor.h"   
+#include "env_sensor.h"     
+#include "mqtt_manager.h"   
+#include "wifi_manager.h"   
+#include "pump_manager.h"  
+#include "ble_config.h" 
 #include "endstop_manager.h"
-#include "nvs.h"    // NVS (obsługa pamięci)
-#include "soil_sensor.h"    // Twój czujnik wilgotności
-#include "env_sensor.h"     // Twój BMP280
-#include "mqtt_manager.h"   // Wysyłanie danych
-#include "ble_config.h"     // Konfiguracja przez telefon
-#include "wifi_manager.h"   // <--- NOWY PLIK: Obsługa WiFi
-#include "pump_manager.h"   // Zarządzanie pompką
 
 #define TAG "MAIN"
-#define BUTTON_GPIO 0       // Przycisk BOOT
+#define BUTTON_GPIO 0 
 
-// Callback do obsługi komendy podlewania z MQTT
+extern esp_err_t get_wifi_ssid(char *ssid, size_t ssid_size);
+extern esp_err_t get_broker_url(char *url, size_t url_size);
+
 static void handle_water_command(float duration_sec) {
     ESP_LOGI(TAG, "🚿 Włączam pompkę na %.1f sekundy!", duration_sec);
-    
     pump_turn_on();
     vTaskDelay(pdMS_TO_TICKS((int)(duration_sec * 1000)));
     pump_turn_off();
-    
-    ESP_LOGI(TAG, "✅ Podlewanie zakończone");
+}
+
+void button_watch_task(void *arg) {
+    bool already_pressed = false;
+
+    while (1) {
+        if (gpio_get_level(BUTTON_GPIO) == 0) {
+            vTaskDelay(pdMS_TO_TICKS(50)); 
+            if (gpio_get_level(BUTTON_GPIO) == 0 && !already_pressed) {
+                ESP_LOGW(TAG, "TRYB SZYBKIEJ EDYCJI (Czasowe BLE)");
+                ble_config_start(false); 
+                already_pressed = true;
+            }
+        } else {
+            already_pressed = false;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+void sensor_reading_task(void *arg) {
+    while (1) {
+        int soil = soil_sensor_get_percentage();
+        float temp = 0.0f, press = 0.0f;
+        env_sensor_read(&temp, &press);
+
+        ESP_LOGI(TAG, "Pomiary: Gleba %d%%, Temp %.2f C", soil, temp);
+        
+        if (wifi_manager_is_connected()) {
+             mqtt_send_sensor_data(soil, temp, press);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
 }
 
 void app_main(void) {
-    // 1. Inicjalizacja NVS (Pamięć trwała)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         nvs_flash_erase();
         nvs_flash_init();
     }
 
-    // 2. Sprawdzenie przycisku (Wejście w tryb konfiguracji)
+    gpio_reset_pin(BUTTON_GPIO);
     gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
-    vTaskDelay(pdMS_TO_TICKS(100)); // Krótka chwila na stabilizację
+    gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
 
     if (gpio_get_level(BUTTON_GPIO) == 0) {
-        ESP_LOGI(TAG, ">>> TRYB KONFIGURACJI BLE URUCHOMIONY <<<");
-        ble_config_start();
+        ESP_LOGW(TAG, "TRYB GŁÓWNEJ KONFIGURACJI (Permanentny)");
+        ESP_LOGW(TAG, "Aby wyjść, kliknij RESET (Enable).");
+        ble_config_start(true);
         
-        // Pętla nieskończona - w trybie config urządzenie tylko czeka na dane.
-        // Po wgraniu danych użytkownik musi zrestartować ESP32.
-        while(1) vTaskDelay(1000 / portTICK_PERIOD_MS);
+        while(1) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
-    // 3. Tryb Normalny (Praca)
-    ESP_LOGI(TAG, "Start systemu w trybie normalnym...");
+    ESP_LOGI(TAG, "START SYSTEMU (Tryb Normalny)");
 
-    // Inicjalizacja czujników
+    char check_ssid[32] = {0};
+    if (get_wifi_ssid(check_ssid, sizeof(check_ssid)) != ESP_OK || strlen(check_ssid) == 0) {
+        ESP_LOGE(TAG, "BRAK DANYCH WIFI! Kliknij przycisk BOOT, aby skonfigurować.");
+    }
+
     soil_sensor_init();
     env_sensor_init();
     pump_manager_init();
+    endstop_manager_init(); 
+    
+    wifi_manager_init();
+    mqtt_manager_init();
 
-    // Sprawdzamy czy mamy w ogóle konfigurację WiFi zapisaną w pamięci
-    char check_ssid[32];
-    if (get_wifi_ssid(check_ssid, sizeof(check_ssid)) == ESP_OK) {
-        
-        // Mamy konfigurację -> Uruchamiamy WiFi i MQTT
-        wifi_manager_init();
-        mqtt_manager_init();
-        
-        // Rejestrujemy callback do obsługi komend podlewania
-        set_water_command_callback(handle_water_command);
-        
-        endstop_manager_init();
-    } else {
-        ESP_LOGE(TAG, "BRAK KONFIGURACJI WIFI! Przytrzymaj przycisk BOOT przy starcie.");
-    }
+    set_water_command_callback(handle_water_command);
 
-    // 4. Pętla główna (Loop)
-    while (1) {
-        // Pobierz dane
-        int soil = soil_sensor_get_percentage();
-        float temp = 0.0f, press = 0.0f;
-        env_sensor_read(&temp, &press);
+    
+    xTaskCreate(button_watch_task, "btn_task", 2048, NULL, 10, NULL);
 
-        // Logowanie
-        ESP_LOGI(TAG, "Pomiary: Gleba %d%%, Temp %.2f C, Cisnienie %.2f hPa", soil, temp, press);
-        
-        // Wysyłanie (MQTT Manager sam sprawdzi czy jest połączenie zanim wyśle)
-        if (wifi_manager_is_connected()) {
-             mqtt_send_sensor_data(soil, temp, press);
-        } else {
-             ESP_LOGW(TAG, "Brak WiFi - dane nie wysłane");
-        }
+    xTaskCreate(sensor_reading_task, "sensor_task", 4096, NULL, 5, NULL);
 
-        vTaskDelay(pdMS_TO_TICKS(5000)); // Czekaj 5 sekund
-    }
+    vTaskDelete(NULL);
 }

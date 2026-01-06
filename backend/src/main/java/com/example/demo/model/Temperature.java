@@ -14,6 +14,8 @@ public class Temperature {
     private Double value;
     private Instant timestamp;
     private String deviceMac;
+    @Column(name = "owner_id")
+    private String ownerId;
 
     @PrePersist void prePersist() { if (timestamp == null) timestamp = Instant.now(); }
 }

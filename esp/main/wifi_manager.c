@@ -7,7 +7,8 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "nvs.h" // Potrzebne do odczytu hasła
+#include "nvs.h"
+#include "mqtt_manager.h"
 
 #define TAG "WIFI_MGR"
 #define WIFI_CONNECTED_BIT BIT0
@@ -25,6 +26,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         s_is_connected = false;
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         ESP_LOGW(TAG, "Rozłączono z WiFi. Próba ponownego połączenia...");
+        mqtt_stop_activity();
         esp_wifi_connect();
     } 
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -32,6 +34,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Uzyskano IP: " IPSTR, IP2STR(&event->ip_info.ip));
         s_is_connected = true;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        mqtt_start_activity();
     }
 }
 
