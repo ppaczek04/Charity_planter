@@ -34,6 +34,12 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  
+  # HTTP package - do wysyłania żądań do backendu
+  http: ^1.2.0
+  
+  # SharedPreferences - do przechowywania tokenu JWT na telefonie
+  shared_preferences: ^2.2.0
 
 dev_dependencies:
   flutter_test:

@@ -1,8 +1,36 @@
 import 'package:flutter/material.dart';
 import 'devices_list_screen.dart';
+import 'services/api_service.dart';
 
-class RegistrationScreen extends StatelessWidget {
+/// RegistrationScreen - ekran rejestracji użytkownika
+/// StatefulWidget bo musimy przechowywać dane z TextFieldów
+/// i śledzić stan wysyłania (loading/error/success)
+class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
+
+  @override
+  State<RegistrationScreen> createState() => _RegistrationScreenState();
+}
+
+class _RegistrationScreenState extends State<RegistrationScreen> {
+  // Kontrolery do TextFieldów - przechowują wartości wpisane przez użytkownika
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _macController = TextEditingController();
+
+  // Flaga czy wysyłka jest w trakcie (do pokazania loading spinner)
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    // Ważne! Usuwamy kontrolery żeby nie było memory leak'u
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _macController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,57 +69,141 @@ class RegistrationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 30),
 
-              const TextField(
-                decoration: InputDecoration(
+              // Pole: Nazwa użytkownika
+              TextField(
+                controller: _usernameController,
+                enabled: !_isLoading, // Wyłączamy pole podczas wysyłki
+                decoration: const InputDecoration(
                   labelText: 'Nazwa użytkownika',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 15),
 
-              const TextField(
-                decoration: InputDecoration(
+              // Pole: Email
+              TextField(
+                controller: _emailController,
+                enabled: !_isLoading,
+                decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 15),
 
-              const TextField(
-                obscureText: true,
-                decoration: InputDecoration(
+              // Pole: Hasło
+              TextField(
+                controller: _passwordController,
+                enabled: !_isLoading,
+                obscureText: true, // Ukrywamy znaki hasła
+                decoration: const InputDecoration(
                   labelText: 'Hasło',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 15),
 
-              const TextField(
-                decoration: InputDecoration(
+              // Pole: MAC Telefonu
+              TextField(
+                controller: _macController,
+                enabled: !_isLoading,
+                decoration: const InputDecoration(
                   labelText: 'MAC Telefonu (np. AA:BB:CC...)',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 20),
 
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const DevicesListScreen(),
+              // Przycisk Zarejestruj się
+              // Pokazujemy loading spinner gdy wysyłka w trakcie
+              _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : ElevatedButton(
+                      onPressed: _handleRegister,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                      ),
+                      child: const Text('Zarejestruj się'),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
-                child: const Text('Zarejestruj się'),
-              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Funkcja obsługi rejestracji
+  /// Wysyła dane do backendu i obsługuje odpowiedź
+  Future<void> _handleRegister() async {
+    // Pobranie wartości z TextFieldów
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final mac = _macController.text.trim();
+
+    // Walidacja - czy pola nie są puste
+    if (username.isEmpty || email.isEmpty || password.isEmpty || mac.isEmpty) {
+      // Pokazujemy error SnackBar (wyskakujący komunikat u dołu ekranu)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wszystkie pola są wymagane')),
+      );
+      return;
+    }
+
+    // Ustawiamy flagę _isLoading na true - pokazuje się loading spinner
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Wysyłamy żądanie rejestracji do backendu (funkcja z ApiService)
+      final success = await ApiService.register(
+        username: username,
+        email: email,
+        password: password,
+        mobileMacAddress: mac,
+      );
+
+      // Sprawdzamy czy rejestracja się powiodła
+      if (success) {
+        // Sukces - pokazujemy komunikat
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Zarejestrowano pomyślnie!')),
+          );
+          // Po 1 sekundzie wracamy do LoginScreen
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              Navigator.pop(context);
+            }
+          });
+        }
+      } else {
+        // Błąd - pokazujemy komunikat błędu
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Błąd rejestracji. Sprawdź dane i spróbuj ponownie.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Jeśli coś poszło nie tak - pokazujemy error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd: $e')),
+        );
+      }
+    } finally {
+      // Niezależnie od wyniku - ukrywamy loading spinner
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 }
