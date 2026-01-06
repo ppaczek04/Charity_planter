@@ -12,9 +12,21 @@
 #include "mqtt_manager.h"   // Wysyłanie danych
 #include "ble_config.h"     // Konfiguracja przez telefon
 #include "wifi_manager.h"   // <--- NOWY PLIK: Obsługa WiFi
+#include "pump_manager.h"   // Zarządzanie pompką
 
 #define TAG "MAIN"
 #define BUTTON_GPIO 0       // Przycisk BOOT
+
+// Callback do obsługi komendy podlewania z MQTT
+static void handle_water_command(float duration_sec) {
+    ESP_LOGI(TAG, "🚿 Włączam pompkę na %.1f sekundy!", duration_sec);
+    
+    pump_turn_on();
+    vTaskDelay(pdMS_TO_TICKS((int)(duration_sec * 1000)));
+    pump_turn_off();
+    
+    ESP_LOGI(TAG, "✅ Podlewanie zakończone");
+}
 
 void app_main(void) {
     // 1. Inicjalizacja NVS (Pamięć trwała)
@@ -43,6 +55,7 @@ void app_main(void) {
     // Inicjalizacja czujników
     soil_sensor_init();
     env_sensor_init();
+    pump_manager_init();
 
     // Sprawdzamy czy mamy w ogóle konfigurację WiFi zapisaną w pamięci
     char check_ssid[32];
@@ -51,6 +64,10 @@ void app_main(void) {
         // Mamy konfigurację -> Uruchamiamy WiFi i MQTT
         wifi_manager_init();
         mqtt_manager_init();
+        
+        // Rejestrujemy callback do obsługi komend podlewania
+        set_water_command_callback(handle_water_command);
+        
         endstop_manager_init();
     } else {
         ESP_LOGE(TAG, "BRAK KONFIGURACJI WIFI! Przytrzymaj przycisk BOOT przy starcie.");

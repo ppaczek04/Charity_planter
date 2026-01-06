@@ -130,7 +130,7 @@ public class MeasurementService {
 
                     // wysyłamy komendę podlewania
                     String commandTopic = String.format("%s/%s/water", userMac, deviceMac);
-                    String commandPayload = "{\"command\": \"WATER_ON\", \"duration_sec\": 5}";
+                    String commandPayload = "{\"command\": \"WATER_ON\", \"duration_sec\": 1.0}";
                     mqttGateway.sendToMqtt(commandPayload, commandTopic);
 
                     System.out.println("📤 Wysłano rozkaz na temat: " + commandTopic);

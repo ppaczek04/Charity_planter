@@ -188,7 +188,7 @@ void ble_config_start(void) {
     // Konfiguracja nazwy urządzenia i danych rozgłoszeniowych
     uint8_t adv_data[] = {
         0x02, 0x01, 0x06, 
-        0x0A, 0x09, 'S', 'm', 'a', 'r', 't', ' ', 'P', 'o', 't', // Nazwa: "Smart Pot"
+        0x10, 0x09, 'C', 'h', 'a', 'r', 'i', 't', 'y', ' ', 'P', 'l', 'a', 'n', 't', 'e', 'r', // Nazwa: "Charity Planter"
         0x03, 0x03, 0xCD, 0xAB 
     };
     esp_ble_gap_config_adv_data_raw(adv_data, sizeof(adv_data));
