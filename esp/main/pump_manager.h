@@ -6,6 +6,5 @@
 void pump_manager_init(void);
 void pump_turn_on(void);  // Włącz pompkę
 void pump_turn_off(void); // Wyłącz pompkę
-bool is_coin_inserted(void); // Czy wrzucono monetę?
 
 #endif

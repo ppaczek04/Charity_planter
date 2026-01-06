@@ -10,8 +10,8 @@
 
 static QueueHandle_t gpio_evt_queue = NULL;
 
-// Zapobiega zaliczeniu monety wielokrotnie przy jednym kliknięciu
-#define DEBOUNCE_TIME_US 200000 
+// Zapobiega zaliczeniu monety wielokrotnie - zwiększony debounce ze względu na zakłócenia od pompki
+#define DEBOUNCE_TIME_US 2000000  // 2 sekundy debounce
 
 // Zmienna przechowująca czas ostatniego wciśnięcia
 static volatile int64_t last_interrupt_time = 0;
@@ -30,13 +30,22 @@ static void endstop_task(void* arg) {
     uint32_t io_num;
     for (;;) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            ESP_LOGI(TAG, "Wykryto wrzut monety na GPIO[%d]!", io_num);
+            ESP_LOGI(TAG, "🪙 Wykryto zdarzenie na GPIO[%d]", io_num);
             
-            mqtt_send_coin_event();
+            // Czekamy 150ms na ustabilizowanie sygnału
+            vTaskDelay(pdMS_TO_TICKS(150));
             
-            gpio_set_level(GPIO_NUM_2, 1);
-            vTaskDelay(pdMS_TO_TICKS(100));
-            gpio_set_level(GPIO_NUM_2, 0);
+            // Sprawdzamy czy endstop nadal jest wciśnięty (LOW = moneta)
+            if (gpio_get_level(COIN_ENDSTOP_PIN) == 0) {
+                ESP_LOGI(TAG, "✅ Potwierdzono wrzut monety!");
+                
+                // Wysyłamy event monety przez MQTT - backend zdecyduje czy podlewać
+                mqtt_send_coin_event();
+                
+                ESP_LOGI(TAG, "📡 Event wysłany do backendu");
+            } else {
+                ESP_LOGW(TAG, "⚠️ Fałszywy alarm - endstop nie jest wciśnięty");
+            }
         }
     }
 }
