@@ -9,7 +9,26 @@ class ApiService {
   // URL backendu - używamy IP komputera bo aplikacja mobilna łączy się z Docker'em na hoście
   // localhost by się nie rozpoznał w emulatorze - musimy IP maszyny hosta
   // wpisz w cmd ipconfig -> IPv4 -> wpisz w baseUrl twój adres IP
-  static const String baseUrl = 'http://192.168.x.x:8080/api';
+  static const String baseUrl = 'http://192.168.0.17:8080/api';
+
+  /// Walidacja formatu email
+  /// Zwraca: true jeśli email ma poprawny format, false w przeciwnym razie
+  static bool isValidEmail(String email) {
+    // Regex dla email'a - najprostszy format: coś@coś.coś
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    return emailRegex.hasMatch(email);
+  }
+
+  /// Walidacja formatu MAC Address
+  /// Poprawny format: AA:BB:CC:DD:EE:FF lub aa:bb:cc:dd:ee:ff
+  /// Zwraca: true jeśli MAC ma poprawny format, false w przeciwnym razie
+  static bool isValidMacAddress(String mac) {
+    // Regex dla MAC address'u: 6 par heksadecymalnych rozdzielonych dwukropkami
+    final macRegex = RegExp(r'^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$');
+    return macRegex.hasMatch(mac);
+  }
 
   /// Rejestracja nowego użytkownika
   /// 

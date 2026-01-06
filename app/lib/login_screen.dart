@@ -127,6 +127,16 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Walidacja formatu email
+    if (!ApiService.isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email ma nieprawidłowy format (np. user@example.com)'),
+        ),
+      );
+      return;
+    }
+
     // Ustawiamy flagę _isLoading na true - pokazuje się loading spinner
     setState(() {
       _isLoading = true;
@@ -147,11 +157,13 @@ class _LoginScreenState extends State<LoginScreen> {
             const SnackBar(content: Text('Zalogowano pomyślnie!')),
           );
           // Nawigujemy do ekranu listy urządzeń
-          Navigator.push(
-            context,
+          // pushAndRemoveUntil usuwa wszystkie poprzednie ekrany ze stosu
+          // dzięki czemu użytkownik nie może wrócić przyciskiem "back"
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => const DevicesListScreen(),
             ),
+            (route) => false, // Usuwa wszystkie poprzednie ekrany
           );
         }
       } else {

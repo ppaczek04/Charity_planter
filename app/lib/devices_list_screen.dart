@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'services/api_service.dart';
+import 'login_screen.dart';
 
 class DevicesListScreen extends StatelessWidget {
   const DevicesListScreen({super.key});
@@ -15,13 +17,24 @@ class DevicesListScreen extends StatelessWidget {
         ),
         backgroundColor: Colors.white,
         centerTitle: false,
-        automaticallyImplyLeading:
-            false,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: () {
-              Navigator.popUntil(context, (route) => route.isFirst);
+            onPressed: () async {
+              // Wylogowanie użytkownika
+              await ApiService.logout();
+              
+              // Sprawdzamy czy widget jest nadal w drzewie (bezpieczeństwo)
+              if (context.mounted) {
+                // Przekierowanie do ekranu logowania i usunięcie historii
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const LoginScreen(),
+                  ),
+                  (route) => false,
+                );
+              }
             },
           ),
         ],

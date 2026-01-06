@@ -152,6 +152,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
 
+    // Walidacja formatu email
+    if (!ApiService.isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email ma nieprawidłowy format (np. user@example.com)'),
+        ),
+      );
+      return;
+    }
+
+    // Walidacja formatu MAC address'u
+    if (!ApiService.isValidMacAddress(mac)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('MAC address ma nieprawidłowy format (np. AA:BB:CC:DD:EE:FF)'),
+        ),
+      );
+      return;
+    }
+
     // Ustawiamy flagę _isLoading na true - pokazuje się loading spinner
     setState(() {
       _isLoading = true;
@@ -168,15 +188,43 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       // Sprawdzamy czy rejestracja się powiodła
       if (success) {
-        // Sukces - pokazujemy komunikat
+        // Sukces - rejestracja powiodła się
+        // Teraz logujemy użytkownika automatycznie (bez powrotu do LoginScreen)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Zarejestrowano pomyślnie!')),
+            const SnackBar(content: Text('Zarejestrowano pomyślnie! Logowanie...')),
           );
-          // Po 1 sekundzie wracamy do LoginScreen
-          Future.delayed(const Duration(seconds: 1), () {
+
+          // Po 500ms robimy auto-login
+          Future.delayed(const Duration(milliseconds: 500), () async {
             if (mounted) {
-              Navigator.pop(context);
+              // Wysyłamy żądanie logowania
+              final token = await ApiService.login(
+                email: email,
+                password: password,
+              );
+
+              // Jeśli logowanie się powiodło
+              if (token != null && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Zalogowano pomyślnie!')),
+                );
+                // Nawigujemy do ekranu listy urządzeń
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const DevicesListScreen(),
+                  ),
+                  (route) => false, // Usuwamy wszystkie poprzednie ekrany
+                );
+              } else {
+                // Logowanie nie powiodło się - wracamy do logowania
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Rejestracja ok, ale logowanie nie powiodło się')),
+                  );
+                  Navigator.pop(context);
+                }
+              }
             }
           });
         }
