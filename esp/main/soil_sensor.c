@@ -6,8 +6,8 @@
 #define ADC_CHANNEL ADC_CHANNEL_6 // GPIO34
 #define ADC_UNIT    ADC_UNIT_1
 
-#define AIR_VALUE   4095
-#define WATER_VALUE 1500
+#define AIR_VALUE   3310
+#define WATER_VALUE 1150
 
 static adc_oneshot_unit_handle_t adc_handle = NULL;
 
@@ -36,11 +36,10 @@ int soil_sensor_read_raw(void) {
 int soil_sensor_get_percentage(void) {
     int raw = soil_sensor_read_raw();
     
-    // Prosta mapa: (raw - min) * 100 / (max - min)
-    // Uwaga: czujniki pojemnościowe często mają odwróconą logikę (powietrze = max volt, woda = min volt)
     if (raw > AIR_VALUE) raw = AIR_VALUE;
+
     if (raw < WATER_VALUE) raw = WATER_VALUE;
 
-    int percent = 100 - ((raw - WATER_VALUE) * 100 / (AIR_VALUE - WATER_VALUE));
+    int percent = (AIR_VALUE - raw) * 100 / (AIR_VALUE - WATER_VALUE);
     return percent;
 }

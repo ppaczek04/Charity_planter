@@ -36,12 +36,6 @@ esp_err_t save_message_to_nvs(const char *message, enum Parameter param) {
 
     const char *namespace_name = get_namespace_name(param);
 
-    if (namespace_name != NULL) {
-        ESP_LOGI(NVS, "Using namespace: %s for parameter: %d", namespace_name, param);
-    } else {
-        ESP_LOGE(NVS, "Failed to get namespace for parameter: %d", param);
-    }
-
     err = nvs_open(namespace_name, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(namespace_name, "Could not open buffer: %s", namespace_name);
@@ -58,7 +52,6 @@ esp_err_t save_message_to_nvs(const char *message, enum Parameter param) {
         if (err == ESP_ERR_NVS_NOT_FOUND) {
             err = nvs_set_str(nvs_handle, key, message);
             if (err == ESP_OK) {
-                ESP_LOGI(namespace_name, "Saved, id=%s", key);
                 nvs_commit(nvs_handle);
             }
             nvs_close(nvs_handle);

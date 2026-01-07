@@ -14,7 +14,6 @@
 #define WIFI_CONNECTED_BIT BIT0
 
 static EventGroupHandle_t s_wifi_event_group;
-static bool s_is_connected = false;
 
 // Obsługa zdarzeń Wi-Fi i IP
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -23,7 +22,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         esp_wifi_connect();
     } 
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        s_is_connected = false;
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         ESP_LOGW(TAG, "Rozłączono z WiFi. Próba ponownego połączenia...");
         mqtt_stop_activity();
@@ -32,7 +30,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Uzyskano IP: " IPSTR, IP2STR(&event->ip_info.ip));
-        s_is_connected = true;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         mqtt_start_activity();
     }
@@ -90,8 +87,4 @@ void wifi_manager_init(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "Inicjalizacja WiFi zakończona. SSID: %s", ssid);
-}
-
-bool wifi_manager_is_connected(void) {
-    return s_is_connected;
 }

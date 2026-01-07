@@ -3,6 +3,7 @@
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 
 #include "nvs.h"    
 #include "soil_sensor.h"   
@@ -16,19 +17,41 @@
 #define TAG "MAIN"
 #define BUTTON_GPIO 0 
 
+static QueueHandle_t water_cmd_queue = NULL;
+
 extern esp_err_t get_wifi_ssid(char *ssid, size_t ssid_size);
 extern esp_err_t get_broker_url(char *url, size_t url_size);
 
 static void handle_water_command(float duration_sec) {
-    ESP_LOGI(TAG, "Włączam pompkę na %.1f sekundy!", duration_sec);
-    pump_turn_on();
-    vTaskDelay(pdMS_TO_TICKS((int)(duration_sec * 1000)));
-    pump_turn_off();
+    if (water_cmd_queue != NULL) {
+        if (xQueueSend(water_cmd_queue, &duration_sec, 0) == pdTRUE) {
+            ESP_LOGI(TAG, "Komenda podlewania dodana do kolejki (%.1fs)", duration_sec);
+        } else {
+            ESP_LOGW(TAG, "Kolejka podlewania pełna! Ignoruję komendę.");
+        }
+    }
+}
+
+void pump_worker_task(void *arg) {
+    float duration;
+
+    while (1) {
+        if (xQueueReceive(water_cmd_queue, &duration, portMAX_DELAY)) {
+            
+            ESP_LOGI(TAG, "ROZPOCZYNAM PODLEWANIE Z KOLEJKI (%.1fs)", duration);
+            
+            pump_turn_on();
+            
+            vTaskDelay(pdMS_TO_TICKS((int)(duration * 1000)));
+            
+            pump_turn_off();
+            vTaskDelay(pdMS_TO_TICKS(2500)); 
+        }
+    }
 }
 
 void button_watch_task(void *arg) {
     bool already_pressed = false;
-
     while (1) {
         if (gpio_get_level(BUTTON_GPIO) == 0) {
             vTaskDelay(pdMS_TO_TICKS(50)); 
@@ -50,9 +73,7 @@ void sensor_reading_task(void *arg) {
         float temp = 0.0f, press = 0.0f;
         env_sensor_read(&temp, &press);
 
-        if (wifi_manager_is_connected()) {
-             mqtt_send_sensor_data(soil, temp, press);
-        }
+        mqtt_send_sensor_data(soil, temp, press);
 
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
@@ -65,15 +86,19 @@ void app_main(void) {
         nvs_flash_init();
     }
 
+    water_cmd_queue = xQueueCreate(10, sizeof(float));
+    if (water_cmd_queue == NULL) {
+        ESP_LOGE(TAG, "Błąd tworzenia kolejki!");
+        return;
+    }
+
     gpio_reset_pin(BUTTON_GPIO);
     gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
     gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
 
     if (gpio_get_level(BUTTON_GPIO) == 0) {
         ESP_LOGW(TAG, "TRYB GŁÓWNEJ KONFIGURACJI (Permanentny)");
-        ESP_LOGW(TAG, "Aby wyjść, kliknij RESET (Enable).");
         ble_config_start(true);
-        
         while(1) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
@@ -94,10 +119,10 @@ void app_main(void) {
 
     set_water_command_callback(handle_water_command);
 
-    
     xTaskCreate(button_watch_task, "btn_task", 2048, NULL, 10, NULL);
-
     xTaskCreate(sensor_reading_task, "sensor_task", 4096, NULL, 5, NULL);
+    
+    xTaskCreate(pump_worker_task, "pump_worker", 2048, NULL, 5, NULL);
 
     vTaskDelete(NULL);
 }
