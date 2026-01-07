@@ -4,7 +4,7 @@
 #include "nvs.h"
 #include "globals.h"
 
-#define MAX_MESSAGES 10
+#define MAX_MESSAGES 30
 #define NVS "NVS"
 #define MQTT "MQTT_NVS"
 

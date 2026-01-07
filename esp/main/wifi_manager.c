@@ -10,30 +10,68 @@
 #include "nvs.h"
 #include "mqtt_manager.h"
 
+#include <time.h>
+#include "esp_log.h"
+#include "esp_sntp.h"
+
 #define TAG "WIFI_MGR"
 #define WIFI_CONNECTED_BIT BIT0
 
 static EventGroupHandle_t s_wifi_event_group;
+
+
+
+static void init_time(void) {
+    ESP_LOGI("TIME", "Inicjalizacja SNTP...");
+
+    // Strefa czasowa: Polska
+    setenv("TZ", "CET-1CEST,M3.5.0/2,M10.5.0/3", 1);
+    tzset();
+
+    // Konfiguracja SNTP
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_setservername(1, "time.nist.gov");
+    esp_sntp_init();
+
+    time_t now = 0;
+    int retry = 0;
+    const int retry_count = 10;
+
+    while (now < 1700000000 && ++retry < retry_count) {
+        ESP_LOGI("TIME", "Czekam na synchronizację czasu... (%d)", retry);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        time(&now);
+    }
+
+    if (now < 1700000000) {
+        ESP_LOGE("TIME", "❌ Synchronizacja NTP NIE POWIODŁA SIĘ");
+    } else {
+        ESP_LOGI("TIME", "✅ Czas zsynchronizowany: %ld", now);
+    }
+}
 
 // Obsługa zdarzeń Wi-Fi i IP
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
-    } 
+    }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         ESP_LOGW(TAG, "Rozłączono z WiFi. Próba ponownego połączenia...");
         mqtt_stop_activity();
         esp_wifi_connect();
-    } 
+    }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        init_time();
         ESP_LOGI(TAG, "Uzyskano IP: " IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         mqtt_start_activity();
     }
 }
+
 
 void wifi_manager_init(void) {
     s_wifi_event_group = xEventGroupCreate();

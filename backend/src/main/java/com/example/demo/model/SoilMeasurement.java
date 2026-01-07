@@ -10,20 +10,21 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SoilMeasurement {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "reading_value", nullable = false)
     private Integer value;
-    private Instant timestamp;
-    private String deviceMac;
-    @Column(name = "owner_id")
-    private String ownerId;
 
-    @PrePersist
-    public void prePersist() {
-        if (timestamp == null) {
-            timestamp = Instant.now();
-        }
-    }
+    @Column(nullable = false)
+    private Instant timestamp;
+
+    @Column(nullable = false)
+    private String deviceMac;
+
+    @Column(name = "owner_id", nullable = false)
+    private String ownerId;
 }
+

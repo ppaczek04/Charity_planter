@@ -6,6 +6,9 @@
 #include "globals.h"
 #include "esp_err.h"
 
+#include <time.h>
+#include <sys/time.h>
+
 #define TAG "MQTT_MGR"
 
 static esp_mqtt_client_handle_t client = NULL;
@@ -62,6 +65,12 @@ static void event_handler(void *handler_args, esp_event_base_t base, int32_t eve
     }
 }
 
+long get_timestamp_seconds(void) {
+    time_t now;
+    time(&now);
+    return (long) now;
+}
+
 void mqtt_manager_init(void) {
     if (get_broker_url(broker_url, sizeof(broker_url)) != ESP_OK) {
         ESP_LOGE(TAG, "Brak URL brokera w NVS");
@@ -87,13 +96,18 @@ void mqtt_manager_init(void) {
 
 static void process_sensor_data(const char *topic, double value, const char *unit, enum Parameter param_type) {
     
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "value", value);
-    if (unit != NULL) {
-        cJSON_AddStringToObject(root, "unit", unit);
-    }
-    char *json_str = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
+	cJSON *root = cJSON_CreateObject();
+	cJSON_AddNumberToObject(root, "value", value);
+
+	long timestamp = get_timestamp_seconds();
+	cJSON_AddNumberToObject(root, "timestamp", timestamp);
+
+	if (unit != NULL) {
+	    cJSON_AddStringToObject(root, "unit", unit);
+	}
+
+	char *json_str = cJSON_PrintUnformatted(root);
+	    cJSON_Delete(root);   // 🔴 WAŻNE: usuwamy root po wygenerowaniu stringa
 
     if (json_str == NULL) {
         ESP_LOGE(TAG, "Błąd alokacji JSON");
@@ -143,3 +157,4 @@ void mqtt_start_activity(void) {
         s_mqtt_started = true;
     }
 }
+
