@@ -32,19 +32,16 @@ static void endstop_task(void* arg) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             ESP_LOGI(TAG, "🪙 Wykryto zdarzenie na GPIO[%d]", io_num);
             
-            // Czekamy 150ms na ustabilizowanie sygnału
             vTaskDelay(pdMS_TO_TICKS(150));
             
-            // Sprawdzamy czy endstop nadal jest wciśnięty (LOW = moneta)
             if (gpio_get_level(COIN_ENDSTOP_PIN) == 0) {
-                ESP_LOGI(TAG, "✅ Potwierdzono wrzut monety!");
+                ESP_LOGI(TAG, "Potwierdzono wrzut monety!");
                 
                 // Wysyłamy event monety przez MQTT - backend zdecyduje czy podlewać
                 mqtt_send_coin_event();
                 
-                ESP_LOGI(TAG, "📡 Event wysłany do backendu");
             } else {
-                ESP_LOGW(TAG, "⚠️ Fałszywy alarm - endstop nie jest wciśnięty");
+                ESP_LOGW(TAG, "Fałszywy alarm - endstop nie jest wciśnięty");
             }
         }
     }

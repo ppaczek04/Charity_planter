@@ -20,7 +20,7 @@ extern esp_err_t get_wifi_ssid(char *ssid, size_t ssid_size);
 extern esp_err_t get_broker_url(char *url, size_t url_size);
 
 static void handle_water_command(float duration_sec) {
-    ESP_LOGI(TAG, "🚿 Włączam pompkę na %.1f sekundy!", duration_sec);
+    ESP_LOGI(TAG, "Włączam pompkę na %.1f sekundy!", duration_sec);
     pump_turn_on();
     vTaskDelay(pdMS_TO_TICKS((int)(duration_sec * 1000)));
     pump_turn_off();
@@ -50,8 +50,6 @@ void sensor_reading_task(void *arg) {
         float temp = 0.0f, press = 0.0f;
         env_sensor_read(&temp, &press);
 
-        ESP_LOGI(TAG, "Pomiary: Gleba %d%%, Temp %.2f C", soil, temp);
-        
         if (wifi_manager_is_connected()) {
              mqtt_send_sensor_data(soil, temp, press);
         }
