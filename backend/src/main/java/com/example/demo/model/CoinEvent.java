@@ -11,9 +11,11 @@ public class CoinEvent {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(name = "reading_value")
-    private Double value; // Np. nominał monety (1.0)
+    private Double value;
     private Instant timestamp;
     private String deviceMac;
+    @Column(name = "owner_id")
+    private String ownerId;
 
     @PrePersist void prePersist() { if (timestamp == null) timestamp = Instant.now(); }
 }
