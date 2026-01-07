@@ -2,8 +2,8 @@
 #define NVS_H
 
 #include "esp_err.h"
-#include "parameter.h"
 #include "mqtt_client.h"
+#include "globals.h"
 
 extern bool is_ssid_set;
 extern bool is_password_set;
@@ -23,7 +23,5 @@ esp_err_t get_wifi_password(char *password, size_t password_size);
 esp_err_t get_broker_url(char *url, size_t url_size);
 esp_err_t get_broker_username(char *username, size_t username_size);
 esp_err_t get_broker_password(char *password, size_t password_size);
-esp_err_t save_user_mac(const char *mac);
-esp_err_t get_user_mac(char *mac);
 
 #endif 
