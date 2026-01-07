@@ -24,3 +24,6 @@ Run docker
 `flutter emulators --launch [phone_name]`
 
 `flutter run`
+
+> Remember to change ip to your local IPv4 when using locally.\
+> Look at the top of `api_service.dart` file.

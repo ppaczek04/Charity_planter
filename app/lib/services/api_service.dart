@@ -9,7 +9,7 @@ class ApiService {
   // URL backendu - używamy IP komputera bo aplikacja mobilna łączy się z Docker'em na hoście
   // localhost by się nie rozpoznał w emulatorze - musimy IP maszyny hosta
   // wpisz w cmd ipconfig -> IPv4 -> wpisz w baseUrl twój adres IP
-  static const String baseUrl = 'http://192.168.0.17:8080/api';
+  static const String baseUrl = 'http://192.168.83.197:8080/api';
 
   /// Walidacja formatu email
   /// Zwraca: true jeśli email ma poprawny format, false w przeciwnym razie
