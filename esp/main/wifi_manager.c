@@ -45,9 +45,9 @@ static void init_time(void) {
     }
 
     if (now < 1700000000) {
-        ESP_LOGE("TIME", "❌ Synchronizacja NTP NIE POWIODŁA SIĘ");
+        ESP_LOGE("TIME", "Synchronizacja NTP NIE POWIODŁA SIĘ");
     } else {
-        ESP_LOGI("TIME", "✅ Czas zsynchronizowany: %ld", now);
+        ESP_LOGI("TIME", "Czas zsynchronizowany: %ld", now);
     }
 }
 

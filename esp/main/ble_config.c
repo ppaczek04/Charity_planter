@@ -180,7 +180,6 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     }
 }
 
-// ... gap_event_handler (BEZ ZMIAN) ...
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
     if (event == ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT) {
         esp_ble_adv_params_t adv_params = {
