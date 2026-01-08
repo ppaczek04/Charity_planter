@@ -107,7 +107,7 @@ static void process_sensor_data(const char *topic, double value, const char *uni
 	}
 
 	char *json_str = cJSON_PrintUnformatted(root);
-	    cJSON_Delete(root);   // 🔴 WAŻNE: usuwamy root po wygenerowaniu stringa
+	    cJSON_Delete(root);   // WAŻNE: usuwamy root po wygenerowaniu stringa
 
     if (json_str == NULL) {
         ESP_LOGE(TAG, "Błąd alokacji JSON");

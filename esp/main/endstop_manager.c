@@ -10,7 +10,7 @@
 
 static QueueHandle_t gpio_evt_queue = NULL;
 
-// Zapobiega zaliczeniu monety wielokrotnie - zwiększony debounce ze względu na zakłócenia od pompki
+// Zapobiega zliczeniu jednej monety wielokrotnie - zwiększony debounce ze względu na zakłócenia od pompki
 #define DEBOUNCE_TIME_US 2000000  // 2 sekundy debounce
 
 // Zmienna przechowująca czas ostatniego wciśnięcia
@@ -30,7 +30,7 @@ static void endstop_task(void* arg) {
     uint32_t io_num;
     for (;;) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            ESP_LOGI(TAG, "🪙 Wykryto zdarzenie na GPIO[%d]", io_num);
+            ESP_LOGI(TAG, "Wykryto zdarzenie na GPIO[%d]", io_num);
             
             vTaskDelay(pdMS_TO_TICKS(150));
             

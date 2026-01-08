@@ -6,7 +6,6 @@
 
 #define TAG "PUMP"
 
-// KONFIGURACJA PINÓW
 #define PUMP_PIN      GPIO_NUM_18  // Przekaźnik pompki
 
 void pump_manager_init(void) {
