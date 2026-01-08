@@ -389,3 +389,9 @@ Caused by: org.h2.jdbc.JdbcSQLNonTransientConnectionException: The connection wa
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:690)
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
 	... 16 more
+2026-01-07 21:18:18.688817Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "truncate [*]pressure"; expected "TABLE"; SQL statement:
+truncate pressure [42001-232]
+2026-01-07 21:18:27.796092Z jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "PRESSURE" not found; SQL statement:
+truncate table pressure [42102-232]
