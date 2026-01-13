@@ -43,7 +43,7 @@ public class MeasurementService {
                 return;
             }
 
-            String userMac = parts[0];
+            String userId = parts[0];
             String deviceMac = parts[1];
             String sensorType = parts[2];
 
@@ -70,7 +70,7 @@ public class MeasurementService {
                     Temperature t = new Temperature();
                     t.setValue(value);
                     t.setDeviceMac(deviceMac);
-                    t.setOwnerId(userMac);
+                    t.setOwnerId(userId);
                     t.setTimestamp(instant);
 
                     temperatureRepository.save(t);
@@ -82,7 +82,7 @@ public class MeasurementService {
                     Pressure p = new Pressure();
                     p.setValue(value);
                     p.setDeviceMac(deviceMac);
-                    p.setOwnerId(userMac);
+                    p.setOwnerId(userId);
                     p.setTimestamp(instant);
 
                     pressureRepository.save(p);
@@ -94,7 +94,7 @@ public class MeasurementService {
                     SoilMeasurement soil = new SoilMeasurement();
                     soil.setValue((int) value);
                     soil.setDeviceMac(deviceMac);
-                    soil.setOwnerId(userMac);
+                    soil.setOwnerId(userId);
                     soil.setTimestamp(instant);
 
                     soilMeasurementRepository.save(soil);
@@ -106,14 +106,14 @@ public class MeasurementService {
                     CoinEvent c = new CoinEvent();
                     c.setValue(value);
                     c.setDeviceMac(deviceMac);
-                    c.setOwnerId(userMac);
+                    c.setOwnerId(userId);
                     c.setTimestamp(instant);
 
                     coinEventRepository.save(c);
                     System.out.println("Zapisano Monetę @ " + instant);
 
                     // wysyłamy komendę podlewania
-                    String commandTopic = String.format("%s/%s/water", userMac, deviceMac);
+                    String commandTopic = String.format("%s/%s/water", userId, deviceMac);
                     String commandPayload = "{\"command\": \"WATER_ON\", \"duration_sec\": 1.0}";
                     mqttGateway.sendToMqtt(commandPayload, commandTopic);
 
@@ -128,5 +128,13 @@ public class MeasurementService {
         } catch (Exception e) {
             System.err.println("Błąd przetwarzania MQTT: " + e.getMessage());
         }
+    }
+
+    public void sendWaterCommand(String userId, String deviceMac, double duration) {
+        String commandTopic = String.format("%s/%s/water", userId, deviceMac);
+        String commandPayload = String.format("{\"command\": \"WATER_ON\", \"duration_sec\": %.1f}", duration);
+
+        mqttGateway.sendToMqtt(commandPayload, commandTopic);
+        System.out.println("Ręczne podlewanie: Wysłano na " + commandTopic);
     }
 }

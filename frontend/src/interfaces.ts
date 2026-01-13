@@ -6,9 +6,23 @@ export interface User {
 }
 
 export interface AuthResponse {
-    token?: string; // Jeśli kiedyś dodasz JWT
+    token?: string;
     id: number;
     username: string;
     email: string;
     mobileMacAddress: string;
 }
+
+export interface Device {
+    id: number;
+    mac: string;
+    ownerId: string;
+    name?: string;
+    isArchived?: boolean;
+}
+
+export const tabTranslations: Record<string, string> = {
+    measurements: 'Statystyki',
+    watering: 'Podlewanie',
+    settings: 'Ustawienia'
+};
