@@ -21,6 +21,8 @@ static QueueHandle_t water_cmd_queue = NULL;
 
 extern esp_err_t get_wifi_ssid(char *ssid, size_t ssid_size);
 extern esp_err_t get_broker_url(char *url, size_t url_size);
+extern uint32_t g_measurement_interval_ms;
+extern void load_measurement_interval(void);
 
 static void handle_water_command(float duration_sec) {
     if (water_cmd_queue != NULL) {
@@ -75,7 +77,7 @@ void sensor_reading_task(void *arg) {
 
         mqtt_send_sensor_data(soil, temp, press);
 
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(g_measurement_interval_ms));
     }
 }
 
@@ -86,6 +88,7 @@ void app_main(void) {
         nvs_flash_init();
     }
 
+    load_measurement_interval();
     water_cmd_queue = xQueueCreate(10, sizeof(float));
     if (water_cmd_queue == NULL) {
         ESP_LOGE(TAG, "Błąd tworzenia kolejki!");

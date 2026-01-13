@@ -3,14 +3,15 @@
 
 #include <stdbool.h>
 
-#define TOPIC_PREFIX "user1/esp32_test"
+extern uint32_t g_measurement_interval_ms;
+#define DEFAULT_INTERVAL_MS 5000
 
-#define WATER_TOPIC "user1/esp32_test/water"
-
-#define TOPIC_SOIL        TOPIC_PREFIX "/soil"
-#define TOPIC_TEMP        TOPIC_PREFIX "/temperature"
-#define TOPIC_PRESS       TOPIC_PREFIX "/pressure"
-#define TOPIC_COIN        TOPIC_PREFIX "/coin_inserted"
+#define TOPIC_SUFFIX_CONFIG       "config"
+#define TOPIC_SUFFIX_WATER        "water"
+#define TOPIC_SUFFIX_SOIL         "soil"
+#define TOPIC_SUFFIX_TEMP         "temperature"
+#define TOPIC_SUFFIX_PRESS        "pressure"
+#define TOPIC_SUFFIX_COIN         "coin_inserted"
 
 #define NVS_NS_SOIL       "soil_buf"
 #define NVS_NS_TEMP       "temp_buf"

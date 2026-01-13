@@ -1,9 +1,10 @@
 package com.example.demo.controller;
 
 import com.example.demo.config.MqttGateway;
+import com.example.demo.dto.WateringRequest;
 import com.example.demo.model.*;
 import com.example.demo.repository.*;
-import org.springframework.format.annotation.DateTimeFormat;
+import com.example.demo.service.MeasurementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,17 +24,23 @@ public class MeasurementController {
     private final SoilMeasurementRepository soilRepo;
     private final CoinEventRepository coinRepo;
     private final MqttGateway mqttGateway;
+    private final MeasurementService measurementService;
+    private final DeviceRepository deviceRepository;
 
     public MeasurementController(TemperatureRepository tempRepo,
                                  PressureRepository pressureRepo,
                                  SoilMeasurementRepository soilRepo,
                                  CoinEventRepository coinRepo,
-                                 MqttGateway mqttGateway) {
+                                 MqttGateway mqttGateway,
+                                 MeasurementService measurementService,
+                                 DeviceRepository deviceRepository) {
         this.tempRepo = tempRepo;
         this.pressureRepo = pressureRepo;
         this.soilRepo = soilRepo;
         this.coinRepo = coinRepo;
         this.mqttGateway = mqttGateway;
+        this.measurementService = measurementService;
+        this.deviceRepository = deviceRepository;
     }
 
     // GET /api/temperatures?deviceMac=AA:BB:CC&from=2023-01-01T00:00:00Z&to=2023-01-02T00:00:00Z
@@ -116,17 +123,18 @@ public class MeasurementController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/devices/{deviceMac}/water")
-    public ResponseEntity<String> triggerWatering(
-            @PathVariable String deviceMac,
-            @RequestParam String userMac,
-            @RequestParam(defaultValue = "1.0") double duration) {
+    @PostMapping("/devices/{deviceId}/water")
+    public ResponseEntity<?> triggerWatering(@PathVariable Long deviceId, @RequestBody WateringRequest request) {
+        return deviceRepository.findById(deviceId)
+                .map(device -> {
+                    double duration = (request.getDuration() != null) ? request.getDuration() : 1.0;
+                    if (duration > 5.0) duration = 5.0;
+                    if (duration < 0.5) duration = 0.5;
 
-        String commandTopic = String.format("%s/%s/water", userMac, deviceMac);
-        String payload = String.format("{\"command\": \"WATER_ON\", \"duration_sec\": %.1f}", duration);
+                    measurementService.sendWaterCommand(device.getOwnerId(), device.getMac(), duration);
 
-        mqttGateway.sendToMqtt(payload, commandTopic);
-
-        return ResponseEntity.ok("Wysłano komendę podlewania na temat: " + commandTopic);
+                    return ResponseEntity.ok("Komenda podlewania wysłana.");
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 }

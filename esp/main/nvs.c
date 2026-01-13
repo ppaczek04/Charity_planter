@@ -13,6 +13,9 @@ bool is_password_set = false;
 bool is_broker_url_set = false;
 bool is_broker_username_set = false;
 bool is_broker_password_set = false;
+bool is_owner_id_set = false;
+
+uint32_t g_measurement_interval_ms = DEFAULT_INTERVAL_MS;
 
 const char* get_namespace_name(enum Parameter param) {
     switch (param) {
@@ -102,15 +105,6 @@ void resend_messages(const char *namespace_name, const char *topic, esp_mqtt_cli
 
     nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
-}
-
-void resend_messages_from_nvs(esp_mqtt_client_handle_t client) {
-    ESP_LOGI("MQTT", "Rozpoczynam wysyłanie danych offline z NVS...");
-
-    resend_messages(NVS_NS_SOIL, TOPIC_SOIL, client);
-    resend_messages(NVS_NS_TEMP, TOPIC_TEMP, client);
-    resend_messages(NVS_NS_PRESS, TOPIC_PRESS, client);
-    resend_messages(NVS_NS_COIN, TOPIC_COIN, client);
 }
 
 esp_err_t save_wifi_ssid(const char *ssid) {
@@ -221,4 +215,46 @@ esp_err_t get_broker_password(char *password, size_t password_size) {
     ret = nvs_get_str(my_handle, "password", password, &password_size);
     nvs_close(my_handle);
     return ret;
+}
+
+esp_err_t save_owner_id(const char *owner_id) {
+    nvs_handle_t my_handle;
+    ESP_ERROR_CHECK(nvs_open("device_config", NVS_READWRITE, &my_handle));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "owner_id", owner_id));
+    ESP_ERROR_CHECK(nvs_commit(my_handle));
+    nvs_close(my_handle);
+    is_owner_id_set = true;
+    return ESP_OK;
+}
+
+esp_err_t get_owner_id(char *owner_id, size_t size) {
+    nvs_handle_t my_handle;
+    esp_err_t ret = nvs_open("device_config", NVS_READWRITE, &my_handle);
+    if (ret != ESP_OK) return ret;
+    ret = nvs_get_str(my_handle, "owner_id", owner_id, &size);
+    nvs_close(my_handle);
+    return ret;
+}
+
+esp_err_t save_measurement_interval(uint32_t interval_ms) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("device_config", NVS_READWRITE, &my_handle);
+    if (err == ESP_OK) {
+        err = nvs_set_u32(my_handle, "interval", interval_ms);
+        nvs_commit(my_handle);
+        nvs_close(my_handle);
+        g_measurement_interval_ms = interval_ms;
+    }
+    return err;
+}
+
+void load_measurement_interval(void) {
+    nvs_handle_t my_handle;
+    if (nvs_open("device_config", NVS_READONLY, &my_handle) == ESP_OK) {
+        uint32_t val = 0;
+        if (nvs_get_u32(my_handle, "interval", &val) == ESP_OK) {
+            g_measurement_interval_ms = val;
+        }
+        nvs_close(my_handle);
+    }
 }
