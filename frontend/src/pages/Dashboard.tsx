@@ -189,11 +189,24 @@ function Dashboard() {
                                     <WateringView 
                                         deviceMac={selectedDevice.mac}
                                         deviceId={selectedDevice.id}
+                                        isHolidayMode={selectedDevice.holidayMode || false}
                                     />
                                 )}
 
                                 {!selectedDevice.isArchived && activeTab === 'settings' && (
-                                    <SettingsView deviceMac={selectedDevice.mac} deviceId={selectedDevice.id}/>
+                                    <SettingsView 
+                                        deviceMac={selectedDevice.mac} 
+                                        deviceId={selectedDevice.id}
+                                        initialSettings={{
+                                            interval: selectedDevice.measurementInterval || 5,
+                                            holidayMode: selectedDevice.holidayMode || false,
+                                            soilMin: selectedDevice.soilMin || 30,
+                                            soilMax: selectedDevice.soilMax || 70
+                                        }}
+                                        onSettingsSaved={(updatedDevice) => {
+                                            setSelectedDevice(updatedDevice);
+                                        }}
+                                    />
                                 )}
                             </div>
                         </div>
