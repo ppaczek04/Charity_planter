@@ -10,4 +10,5 @@ public interface SoilMeasurementRepository extends JpaRepository<SoilMeasurement
     List<SoilMeasurement> findByDeviceMacAndOwnerIdAndTimestampBetweenOrderByTimestampDesc(
             String deviceMac, String ownerId, Instant start, Instant end);
     List<SoilMeasurement> findByOwnerIdOrderByTimestampDesc(String ownerId);
+    SoilMeasurement findTopByDeviceMacOrderByTimestampDesc(String deviceMac);
 }

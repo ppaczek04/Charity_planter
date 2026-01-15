@@ -1,31 +1,53 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../api/axiosConfig';
 
 interface SettingsViewProps {
     deviceMac: string;
     deviceId: number;
+    initialSettings: {
+        interval: number;
+        holidayMode: boolean;
+        soilMin: number;
+        soilMax: number;
+    };
+    onSettingsSaved: (updatedDevice: any) => void;
 }
 
-const SettingsView = ({ deviceId }: SettingsViewProps) => {
-    const [interval, setInterval] = useState<number>(5);
+const SettingsView = ({ deviceId, initialSettings, onSettingsSaved }: SettingsViewProps) => {
+    const [interval, setInterval] = useState(initialSettings.interval);
+    const [isHolidayMode, setIsHolidayMode] = useState(initialSettings.holidayMode);
+    const [soilMin, setSoilMin] = useState(initialSettings.soilMin);
+    const [soilMax, setSoilMax] = useState(initialSettings.soilMax);
+    const [loading, setLoading] = useState(false);
 
-    const [soilMin, setSoilMin] = useState<number>(30);
-    const [soilMax, setSoilMax] = useState<number>(70);
-
-    const [loading, setLoading] = useState<boolean>(false);
-
+    useEffect(() => {
+        setInterval(initialSettings.interval);
+        setIsHolidayMode(initialSettings.holidayMode);
+        setSoilMin(initialSettings.soilMin);
+        setSoilMax(initialSettings.soilMax);
+    }, [initialSettings]);
+    
     const handleSave = async () => {
         setLoading(true);
-        
+        if (soilMin >= soilMax) {
+            alert("Próg minimalny musi być mniejszy od maksymalnego!");
+            setLoading(false);
+            return;
+        }
+
         try {
-            await api.put(`/devices/${deviceId}/settings`, {
-                interval: interval
+            const response = await api.put(`/devices/${deviceId}/settings`, {
+                interval: interval,
+                holidayMode: isHolidayMode,
+                soilMin: soilMin,
+                soilMax: soilMax
             });
 
-            alert(`Ustawienia zostały wysłane do urządzenia!`);
+            alert(`Konfiguracja zapisana!`);
+            onSettingsSaved(response.data); 
         } catch (error) {
             console.error(error);
-            alert("Błąd podczas zapisywania ustawień.");
+            alert("Błąd zapisu ustawień.");
         } finally {
             setLoading(false);
         }
@@ -33,33 +55,19 @@ const SettingsView = ({ deviceId }: SettingsViewProps) => {
 
     return (
         <div className="row g-4">
-            
             <div className="col-12">
                 <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white border-bottom-0 pt-4 px-4 pb-0">
-                        <div className="d-flex align-items-center gap-3">
-                            <div className="rounded-circle p-2 bg-light" style={{ color: '#6f42c1' }}>
-                                <i className="bi bi-clock-history fs-4"></i>
-                            </div>
-                            <h5 className="mb-0 fw-bold">Częstotliwość pomiarów</h5>
+                    <div className="card-body px-4 py-4">
+                        <div className="d-flex align-items-center gap-3 mb-3">
+                            <i className="bi bi-clock-history fs-4 text-primary"></i>
+                            <h5 className="mb-0 fw-bold">Interwał pomiarów</h5>
                         </div>
-                    </div>
-                    <div className="card-body px-4 pb-4">
-                        <p className="text-muted small mb-3">
-                            Określ, co ile sekund urządzenie ma wybudzać się i wysyłać aktualne dane do serwera.
-                        </p>
                         <div className="input-group" style={{ maxWidth: '300px' }}>
-                            <span className="input-group-text bg-light border-end-0">
-                                <i className="bi bi-stopwatch"></i>
-                            </span>
                             <input 
-                                type="number" 
-                                className="form-control border-start-0 ps-0"
-                                value={interval}
-                                onChange={(e) => setInterval(parseInt(e.target.value) || 0)}
-                                min="5"
+                                type="number" className="form-control" value={interval}
+                                onChange={(e) => setInterval(parseInt(e.target.value) || 5)} min="5"
                             />
-                            <span className="input-group-text bg-light">sekund</span>
+                            <span className="input-group-text">sekund</span>
                         </div>
                     </div>
                 </div>
@@ -67,114 +75,71 @@ const SettingsView = ({ deviceId }: SettingsViewProps) => {
 
             <div className="col-12">
                 <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white border-bottom-0 pt-4 px-4 pb-0">
-                        <div className="d-flex align-items-center gap-3">
-                            <div className="rounded-circle p-2 bg-light" style={{ color: '#6f42c1' }}>
-                                <i className="bi bi-moisture fs-4"></i>
+                    <div className="card-body px-4 py-4">
+                        <div className="d-flex justify-content-between align-items-center">
+                            <div className="d-flex align-items-center gap-3">
+                                <i className="bi bi-airplane-fill fs-4 text-success"></i>
+                                <div>
+                                    <h5 className="mb-0 fw-bold">Tryb wakacyjny</h5>
+                                    <small className="text-muted">Gdy włączony, umożliwia zdalne podlewanie bez monety.</small>
+                                </div>
                             </div>
-                            <h5 className="mb-0 fw-bold">Wilgotność gleby i automatyzacja</h5>
+                            <div className="form-check form-switch fs-3">
+                                <input 
+                                    className="form-check-input" type="checkbox" role="switch"
+                                    checked={isHolidayMode}
+                                    onChange={() => setIsHolidayMode(!isHolidayMode)}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div className="card-body px-4 pb-4">
-                        <p className="text-muted small mb-4">
-                            Skonfiguruj progi wilgotności, aby system wiedział, kiedy Twoja roślina potrzebuje wody.
-                        </p>
 
-                        <div className="row g-4">
-                            <div className="col-md-6">
-                                <div className="p-3 border rounded bg-light bg-opacity-25 h-100 position-relative">
-                                    <div className="d-flex align-items-center gap-2 mb-3" style={{ color: '#dc3545' }}>
-                                        <i className="bi bi-droplet-half fs-5"></i>
-                                        <span className="fw-bold text-dark">Próg minimalny (Susza)</span>
-                                    </div>
-                                    
-                                    <label className="form-label text-muted small mb-1">
-                                        Jeśli wilgotność spadnie <strong>poniżej</strong>:
-                                    </label>
+                        <hr className="my-4 opacity-10" />
+
+                        <div className="d-flex align-items-center gap-3 mb-3">
+                             <i className="bi bi-moisture fs-4" style={{ color: '#fd7e14' }}></i>
+                             <div>
+                                <h5 className="mb-0 fw-bold">Progi wilgotności</h5>
+                                <small className="text-muted">Definiują strefy "za sucho" i "za mokro".</small>
+                             </div>
+                        </div>
+
+                        <div className="mt-3">
+                            <div className="row g-3">
+                                <div className="col-md-6">
+                                    <label className="form-label small text-muted fw-bold">Próg Suszy (Min %)</label>
                                     <div className="input-group">
                                         <input 
-                                            type="number" 
-                                            className="form-control"
-                                            value={soilMin}
-                                            onChange={(e) => setSoilMin(parseFloat(e.target.value) || 0)}
-                                            min="0" max="100"
+                                            type="number" className="form-control" value={soilMin}
+                                            onChange={(e) => setSoilMin(parseInt(e.target.value))} 
                                         />
                                         <span className="input-group-text">%</span>
                                     </div>
-                                    <div className="form-text text-danger small mt-2">
-                                        <i className="bi bi-arrow-return-right me-1"></i>
-                                        System uruchomi podlewanie.
-                                    </div>
+                                    <div className="form-text small">Poniżej tej wartości system pozwoli podlać.</div>
                                 </div>
-                            </div>
-
-                            <div className="col-md-6">
-                                <div className="p-3 border rounded bg-light bg-opacity-25 h-100">
-                                    <div className="d-flex align-items-center gap-2 mb-3" style={{ color: '#198754' }}>
-                                        <span className="fw-bold text-dark">Próg maksymalny</span>
-                                    </div>
-
-                                    <label className="form-label text-muted small mb-1">
-                                        Jeśli wilgotność jest <strong>powyżej</strong>:
-                                    </label>
+                                <div className="col-md-6">
+                                    <label className="form-label small text-muted fw-bold">Próg Stop (Max %)</label>
                                     <div className="input-group">
                                         <input 
-                                            type="number" 
-                                            className="form-control"
-                                            value={soilMax}
-                                            onChange={(e) => setSoilMax(parseFloat(e.target.value) || 0)}
-                                            min="0" max="100"
+                                            type="number" className="form-control" value={soilMax}
+                                            onChange={(e) => setSoilMax(parseInt(e.target.value))} 
                                         />
                                         <span className="input-group-text">%</span>
                                     </div>
-                                    <div className="form-text text-success small mt-2">
-                                        <i className="bi bi-check-circle me-1"></i>
-                                        Gleba jest wilgotna, system nie będzie podlewać.
-                                    </div>
+                                    <div className="form-text small">Powyżej tej wartości system zablokuje podlewanie.</div>
                                 </div>
                             </div>
                         </div>
-
-                        <div className="mt-4">
-                            <label className="text-muted small mb-2 d-block">Wizualizacja zakresu idealnego:</label>
-                            <div className="progress" style={{ height: '10px' }}>
-                                <div 
-                                    className="progress-bar bg-danger bg-opacity-50" 
-                                    role="progressbar" 
-                                    style={{ width: `${soilMin}%` }}
-                                ></div>
-                                <div 
-                                    className="progress-bar bg-success" 
-                                    role="progressbar" 
-                                    style={{ width: `${soilMax - soilMin}%` }}
-                                ></div>
-                                <div 
-                                    className="progress-bar bg-info bg-opacity-25" 
-                                    role="progressbar" 
-                                    style={{ width: `${100 - soilMax}%` }}
-                                ></div>
-                            </div>
-                            <div className="d-flex justify-content-between text-muted" style={{ fontSize: '0.75rem', marginTop: '4px' }}>
-                                <span>0% (Za sucho)</span>
-                                <span>100% (Za mokro)</span>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
             </div>
 
             <div className="col-12 text-end">
-                <button 
-                    className="btn btn-lg text-white px-5 shadow-sm"
-                    style={{ backgroundColor: '#6f42c1' }}
-                    onClick={handleSave}
-                    disabled={loading}
-                >
+                <button className="btn btn-primary btn-lg px-5 shadow-sm" onClick={handleSave} disabled={loading}>
                     {loading ? (
                         <span><span className="spinner-border spinner-border-sm me-2"></span>Zapisywanie...</span>
                     ) : (
-                        <span>Zapisz konfigurację</span>
+                        'Zapisz konfigurację'
                     )}
                 </button>
             </div>

@@ -106,22 +106,22 @@ public class DeviceController {
     @PutMapping("/{deviceId}/settings")
     public ResponseEntity<?> updateSettings(@PathVariable Long deviceId, @RequestBody SettingsRequest request) {
         return deviceRepository.findById(deviceId)
-                .map(device -> {
-                    if (request.getInterval() != null && request.getInterval() < 5) {
-                        return ResponseEntity.badRequest().body("Interwał musi wynosić min. 5 sekund.");
-                    }
+            .map(device -> {
+                if (request.getInterval() != null) device.setMeasurementInterval(request.getInterval());
+                if (request.getHolidayMode() != null) device.setHolidayMode(request.getHolidayMode());
+                if (request.getSoilMin() != null) device.setSoilMin(request.getSoilMin());
+                if (request.getSoilMax() != null) device.setSoilMax(request.getSoilMax());
 
-                    if (request.getInterval() != null) {
-                        String topic = String.format("%s/%s/config", device.getOwnerId(), device.getMac());
-                        String payload = String.format("{\"interval\": %d}", request.getInterval());
+                deviceRepository.save(device);
 
-                        mqttGateway.sendToMqtt(payload, topic);
-                    }
+                if (request.getInterval() != null) {
+                    String topic = String.format("%s/%s/config", device.getOwnerId(), device.getMac());
+                    String payload = String.format("{\"interval\": %d}", request.getInterval());
+                    mqttGateway.sendToMqtt(payload, topic);
+                }
 
-                    // Tu w przyszłości zapiszesz ustawienia też do bazy SQL (żeby pamiętać je na froncie)
-
-                    return ResponseEntity.ok("Ustawienia wysłane do urządzenia.");
-                })
-                .orElse(ResponseEntity.notFound().build());
+                return ResponseEntity.ok(device);
+            })
+            .orElse(ResponseEntity.notFound().build());
     }
 }

@@ -19,6 +19,10 @@ export interface Device {
     ownerId: string;
     name?: string;
     isArchived?: boolean;
+    holidayMode?: boolean;
+    soilMin?: number;
+    soilMax?: number;
+    measurementInterval?: number;
 }
 
 export const tabTranslations: Record<string, string> = {

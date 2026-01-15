@@ -24,4 +24,9 @@ public class Device {
 
     @Column(name = "device_name")
     private String name;
+
+    private boolean holidayMode;
+    private Integer measurementInterval = 5;
+    private Integer soilMin = 30;
+    private Integer soilMax = 70;
 }

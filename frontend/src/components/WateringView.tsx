@@ -4,119 +4,73 @@ import api from '../api/axiosConfig';
 interface WateringViewProps {
     deviceMac: string;
     deviceId: number; 
+    isHolidayMode: boolean;
 }
 
-const WateringView = ({ deviceMac, deviceId }: WateringViewProps) => {
+const WateringView = ({ deviceId, isHolidayMode }: WateringViewProps) => {
     const [duration, setDuration] = useState<number>(1.0);
-    const [isHolidayMode, setIsHolidayMode] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
 
     const handleWaterClick = async () => {
         setLoading(true);
         try {
-            await api.post(`/devices/${deviceId}/water`, {
-                duration: duration
-            });
-            
-            alert(`Wysłano komendę podlania na ${duration}s!`);
+            await api.post(`/devices/${deviceId}/water`, { duration: duration });
+            alert(`Podlano roślinę!`);
         } catch (error) {
-            console.error("Błąd podlewania:", error);
+            console.error("Błąd:", error);
             alert("Nie udało się wysłać komendy.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleHolidayToggle = () => {
-        const newState = !isHolidayMode;
-        setIsHolidayMode(newState);
-        console.log(`[MOCK] Tryb wakacyjny dla ${deviceMac}: ${newState ? 'WŁĄCZONY' : 'WYŁĄCZONY'}`);
-    };
-
     return (
-        <div className="row g-4">
-            <div className="col-md-6">
-                <div className="card shadow-sm border-0 h-100">
-                    <div className="card-body p-4">
-                        <div className="d-flex align-items-center gap-3 mb-4">
-                            <div className="rounded-circle p-3 bg-light" style={{ color: '#6f42c1' }}>
-                                <i className="bi bi-droplet-fill fs-4"></i>
-                            </div>
-                            <h5 className="mb-0 fw-bold">Podlewanie na żądanie</h5>
+        <div className="row justify-content-center">
+            <div className="col-md-8">
+                <div className="card shadow-sm border-0">
+                    <div className="card-body p-5 text-center">
+                        
+                        <div className="mb-4">
+                            <i className={`bi bi-droplet-fill fs-1 ${isHolidayMode ? 'text-primary' : 'text-muted'}`}></i>
+                            <h3 className="fw-bold mt-3">Podlewanie ręczne</h3>
                         </div>
 
-                        <p className="text-muted small">
-                            Uruchom pompkę ręcznie. Pamiętaj, aby nie przelać rośliny!
-                        </p>
+                        {isHolidayMode ? (
+                            <>
+                                <p className="text-success mb-4">
+                                    <i className="bi bi-check-circle-fill me-2"></i>
+                                    Tryb wakacyjny jest aktywny. Możesz zdalnie podlać roślinę.
+                                </p>
 
-                        <label className="form-label fw-bold text-muted small">Czas podlewania (sekundy)</label>
-                        <div className="input-group mb-4">
-                            <input 
-                                type="number" 
-                                className="form-control form-control-lg"
-                                value={duration}
-                                onChange={(e) => setDuration(parseFloat(e.target.value))}
-                                min="0.5"
-                                step="0.5"
-                            />
-                            <span className="input-group-text bg-light">sek</span>
-                        </div>
+                                <div className="input-group mb-4 mx-auto" style={{ maxWidth: '300px' }}>
+                                    <input 
+                                        type="number" className="form-control form-control-lg"
+                                        value={duration} onChange={(e) => setDuration(parseFloat(e.target.value))}
+                                        min="0.5" step="0.5"
+                                    />
+                                    <span className="input-group-text">sek</span>
+                                </div>
 
-                        <button 
-                            className="btn w-100 btn-lg text-white"
-                            style={{ backgroundColor: '#6f42c1' }}
-                            onClick={handleWaterClick}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <span><span className="spinner-border spinner-border-sm me-2"></span>Wysyłanie...</span>
-                            ) : (
-                                <span><i className="bi bi-water me-2"></i>Podlej teraz</span>
-                            )}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="col-md-6">
-                <div className="card shadow-sm border-0 h-100">
-                    <div className="card-body p-4">
-                        <div className="d-flex align-items-center gap-3 mb-4">
-                            <div className="rounded-circle p-3 bg-light" style={{ color: '#6f42c1' }}>
-                                <i className="bi bi-airplane-fill fs-4"></i>
+                                <button 
+                                    className="btn btn-primary btn-lg w-100" 
+                                    onClick={handleWaterClick} 
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Wysyłanie...' : 'Podlej teraz'}
+                                </button>
+                            </>
+                        ) : (
+                            <div className="alert alert-secondary mt-3">
+                                <h5 className="alert-heading"><i className="bi bi-lock-fill"></i> Funkcja niedostępna</h5>
+                                <p className="mb-0 mt-2">
+                                    W trybie standardowym podlewanie odbywa się tylko po wrzuceniu monety.
+                                </p>
+                                <hr />
+                                <p className="mb-0 small">
+                                    Aby odblokować podlewanie ręczne, przejdź do zakładki <strong>Ustawienia</strong> i włącz <strong>Tryb Wakacyjny</strong>.
+                                </p>
                             </div>
-                            <h5 className="mb-0 fw-bold">Tryb wakacyjny</h5>
-                        </div>
-
-                        <p className="text-muted small">
-                            W tym trybie doniczka będzie automatycznie dbać o minimalną wilgotność, ignorując standardowy harmonogram.
-                        </p>
-
-                        <hr className="my-4 opacity-10" />
-
-                        <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 className="mb-1">Aktywuj tryb</h6>
-                                <small className={isHolidayMode ? "text-success fw-bold" : "text-muted"}>
-                                    {isHolidayMode ? "Włączony" : "Wyłączony"}
-                                </small>
-                            </div>
-
-                            <div className="form-check form-switch fs-3">
-                                <input 
-                                    className="form-check-input" 
-                                    type="checkbox" 
-                                    role="switch" 
-                                    checked={isHolidayMode}
-                                    onChange={handleHolidayToggle}
-                                    style={{ 
-                                        cursor: 'pointer', 
-                                        backgroundColor: isHolidayMode ? '#6f42c1' : undefined,
-                                        borderColor: isHolidayMode ? '#6f42c1' : undefined
-                                    }}
-                                />
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
