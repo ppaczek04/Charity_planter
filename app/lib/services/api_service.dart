@@ -9,7 +9,7 @@ class ApiService {
   // URL backendu - używamy IP komputera bo aplikacja mobilna łączy się z Docker'em na hoście
   // localhost by się nie rozpoznał w emulatorze - musimy IP maszyny hosta
   // wpisz w cmd ipconfig -> IPv4 -> wpisz w baseUrl twój adres IP
-  static const String baseUrl = 'http://192.168.83.197:8080/api';
+  static const String baseUrl = 'http://192.168.101.7:8080/api';
 
   /// Walidacja formatu email
   /// Zwraca: true jeśli email ma poprawny format, false w przeciwnym razie
@@ -21,28 +21,17 @@ class ApiService {
     return emailRegex.hasMatch(email);
   }
 
-  /// Walidacja formatu MAC Address
-  /// Poprawny format: AA:BB:CC:DD:EE:FF lub aa:bb:cc:dd:ee:ff
-  /// Zwraca: true jeśli MAC ma poprawny format, false w przeciwnym razie
-  static bool isValidMacAddress(String mac) {
-    // Regex dla MAC address'u: 6 par heksadecymalnych rozdzielonych dwukropkami
-    final macRegex = RegExp(r'^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$');
-    return macRegex.hasMatch(mac);
-  }
-
   /// Rejestracja nowego użytkownika
   /// 
   /// [username] - nazwa użytkownika
   /// [email] - email użytkownika
   /// [password] - hasło
-  /// [mobileMacAddress] - MAC adres telefonu (opcjonalnie)
   /// 
   /// Zwraca: true jeśli rejestracja się powiodła, false jeśli błąd
   static Future<bool> register({
     required String username,
     required String email,
     required String password,
-    required String mobileMacAddress,
   }) async {
     try {
       // Tworzymy JSON body z danymi do wysłania
@@ -50,7 +39,6 @@ class ApiService {
         'username': username,
         'email': email,
         'password': password,
-        'mobileMacAddress': mobileMacAddress,
       });
 
       // Wysyłamy POST request do backendu

@@ -17,7 +17,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _macController = TextEditingController();
 
   // Flaga czy wysyłka jest w trakcie (do pokazania loading spinner)
   bool _isLoading = false;
@@ -28,7 +27,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _macController.dispose();
     super.dispose();
   }
 
@@ -101,17 +99,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 15),
-
-              // Pole: MAC Telefonu
-              TextField(
-                controller: _macController,
-                enabled: !_isLoading,
-                decoration: const InputDecoration(
-                  labelText: 'MAC Telefonu (np. AA:BB:CC...)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
               const SizedBox(height: 20),
 
               // Przycisk Zarejestruj się
@@ -141,10 +128,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final mac = _macController.text.trim();
 
     // Walidacja - czy pola nie są puste
-    if (username.isEmpty || email.isEmpty || password.isEmpty || mac.isEmpty) {
+    if (username.isEmpty || email.isEmpty || password.isEmpty) {
       // Pokazujemy error SnackBar (wyskakujący komunikat u dołu ekranu)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Wszystkie pola są wymagane')),
@@ -162,16 +148,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
 
-    // Walidacja formatu MAC address'u
-    if (!ApiService.isValidMacAddress(mac)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('MAC address ma nieprawidłowy format (np. AA:BB:CC:DD:EE:FF)'),
-        ),
-      );
-      return;
-    }
-
     // Ustawiamy flagę _isLoading na true - pokazuje się loading spinner
     setState(() {
       _isLoading = true;
@@ -183,7 +159,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         username: username,
         email: email,
         password: password,
-        mobileMacAddress: mac,
       );
 
       // Sprawdzamy czy rejestracja się powiodła
