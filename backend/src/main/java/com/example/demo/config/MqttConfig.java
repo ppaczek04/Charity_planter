@@ -17,21 +17,21 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 
+import java.util.UUID;
+
 @Configuration
 public class MqttConfig {
 
     @Value("${mqtt.broker}")
     private String brokerUrl;
 
-    @Value("${mqtt.topic}")
-    private String topic;
-
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions options = new MqttConnectOptions();
         options.setServerURIs(new String[]{ brokerUrl });
-        options.setAutomaticReconnect(true); // Warto dodać
+        options.setAutomaticReconnect(true);
+        options.setCleanSession(true);
         factory.setConnectionOptions(options);
         return factory;
     }
@@ -41,32 +41,12 @@ public class MqttConfig {
         return new DirectChannel();
     }
 
-//    @Bean
-//    public MessageProducer inbound(MqttPahoClientFactory clientFactory) {
-//        MqttPahoMessageDrivenChannelAdapter adapter =
-//                new MqttPahoMessageDrivenChannelAdapter("backend-subscriber", clientFactory, topic);
-//        adapter.setQos(1);
-//        adapter.setConverter(new DefaultPahoMessageConverter());
-//        adapter.setOutputChannel(mqttInputChannel());
-//        return adapter;
-//    }
-//
-//    // Tutaj wstrzykujemy nasz nowy MeasurementService!
-//    @Bean
-//    @ServiceActivator(inputChannel = "mqttInputChannel")
-//    public MessageHandler handler(MeasurementService measurementService) {
-//        return message -> {
-//            String payload = String.valueOf(message.getPayload());
-//            System.out.println("[MQTT] 📩 Wiadomość: " + payload);
-//            // Zlecamy pracę serwisowi
-//            measurementService.processAndSave(payload);
-//        };
-//    }
     @Bean
     public MessageProducer inbound(MqttPahoClientFactory clientFactory) {
-        // Nasłuchujemy na WSZYSTKO co ma 3 poziomy (user/device/sensor)
+        String clientId = "backend-sub-" + UUID.randomUUID().toString();
+
         MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter("backend-sub", clientFactory, "+/+/+");
+                new MqttPahoMessageDrivenChannelAdapter(clientId, clientFactory, "+/+/+");
 
         adapter.setQos(1);
         adapter.setConverter(new DefaultPahoMessageConverter());
@@ -78,11 +58,8 @@ public class MqttConfig {
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public MessageHandler handler(MeasurementService service) {
         return message -> {
-            // Wyciągamy temat z nagłówka wiadomości
             String topic = (String) message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC);
             String payload = String.valueOf(message.getPayload());
-
-            // Przekazujemy do serwisu
             service.processMessage(topic, payload);
         };
     }
@@ -92,12 +69,12 @@ public class MqttConfig {
         return new DirectChannel();
     }
 
-    // 2. Handler, który faktycznie wypycha wiadomości do brokera
     @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
     public MessageHandler mqttOutbound(MqttPahoClientFactory clientFactory) {
-        // "backend-sender" to ID klienta do wysyłania (musi być inne niż do odbierania)
-        MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler("backend-sender", clientFactory);
+        String clientId = "backend-sender-" + UUID.randomUUID().toString();
+
+        MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler(clientId, clientFactory);
         messageHandler.setAsync(true);
         messageHandler.setDefaultTopic("default/topic");
         return messageHandler;

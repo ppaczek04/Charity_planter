@@ -6,40 +6,8 @@ import com.example.demo.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
-
-//@Service
-//public class MeasurementService {
-//
-//    private final SoilMeasurementRepository repository;
-//    private final ObjectMapper objectMapper;
-//
-//    public MeasurementService(SoilMeasurementRepository repository, ObjectMapper objectMapper) {
-//        this.repository = repository;
-//        this.objectMapper = objectMapper;
-//    }
-//
-//    public void processAndSave(String payload) {
-//        try {
-//            JsonNode node = objectMapper.readTree(payload);
-//
-//            int soilPercent = node.path("soil_percent").asInt();
-//            // Handle nulls safely
-//            Double temperature = node.has("temperature_c") ? node.get("temperature_c").asDouble() : null;
-//            Double pressure = node.has("pressure_hpa") ? node.get("pressure_hpa").asDouble() : null;
-//
-//            SoilMeasurement measurement = new SoilMeasurement();
-//            measurement.setMoisture(soilPercent);
-//            measurement.setTemperature(temperature);
-//            measurement.setPressure(pressure);
-//
-//            repository.save(measurement);
-//
-//            System.out.println("[DB] 💾 Zapisano: Wilg=" + soilPercent + "%, Temp=" + temperature);
-//        } catch (Exception e) {
-//            System.err.println("[Service] ❌ Błąd przetwarzania JSON: " + e.getMessage());
-//        }
-//    }
-//}
+import java.time.Instant;
+import java.util.Optional;
 
 @Service
 public class MeasurementService {
@@ -48,6 +16,7 @@ public class MeasurementService {
     private final PressureRepository pressureRepository;
     private final SoilMeasurementRepository soilMeasurementRepository;
     private final CoinEventRepository coinEventRepository;
+    private final DeviceRepository deviceRepository;
     private final ObjectMapper objectMapper;
     private final MqttGateway mqttGateway;
 
@@ -56,6 +25,7 @@ public class MeasurementService {
             PressureRepository pressureRepository,
             SoilMeasurementRepository soilMeasurementRepository,
             CoinEventRepository coinEventRepository,
+            DeviceRepository deviceRepository,
             ObjectMapper objectMapper,
             MqttGateway mqttGateway
     ) {
@@ -63,6 +33,7 @@ public class MeasurementService {
         this.pressureRepository = pressureRepository;
         this.soilMeasurementRepository = soilMeasurementRepository;
         this.coinEventRepository = coinEventRepository;
+        this.deviceRepository = deviceRepository;
         this.objectMapper = objectMapper;
         this.mqttGateway = mqttGateway;
     }
@@ -72,26 +43,28 @@ public class MeasurementService {
             // topic: user_mac/device_mac/sensor
             String[] parts = topic.split("/");
             if (parts.length < 3) {
+                System.out.println("Nieprawidłowy topic: " + topic);
                 return;
             }
 
-            String userMac = parts[0];
+            String userId = parts[0];
             String deviceMac = parts[1];
             String sensorType = parts[2];
 
-            // komendy sterujące pomijamy
             if ("water".equals(sensorType)) {
                 return;
             }
 
             JsonNode node = objectMapper.readTree(payload);
 
-            if (!node.has("value")) {
-                System.out.println("⚠️ Ignoruję wiadomość bez pola 'value' (Topic: " + topic + ")");
+            if (!node.has("value") || !node.has("timestamp")) {
+                System.out.println("Ignoruję wiadomość bez value lub timestamp (Topic: " + topic + ")");
                 return;
             }
 
             double value = node.get("value").asDouble();
+            long timestamp = node.get("timestamp").asLong();
+            Instant instant = Instant.ofEpochSecond(timestamp);
 
             switch (sensorType) {
 
@@ -99,8 +72,10 @@ public class MeasurementService {
                     Temperature t = new Temperature();
                     t.setValue(value);
                     t.setDeviceMac(deviceMac);
+                    t.setOwnerId(userId);
+                    t.setTimestamp(instant);
                     temperatureRepository.save(t);
-                    System.out.println("🌡️ Zapisano Temp: " + value);
+                    System.out.println("Zapisano Temp: " + value + " @ " + instant);
                     break;
                 }
 
@@ -108,16 +83,21 @@ public class MeasurementService {
                     Pressure p = new Pressure();
                     p.setValue(value);
                     p.setDeviceMac(deviceMac);
+                    p.setOwnerId(userId);
+                    p.setTimestamp(instant);
                     pressureRepository.save(p);
-                    System.out.println("🧭 Zapisano Ciśnienie: " + value);
+                    System.out.println("Zapisano Ciśnienie: " + value + " @ " + instant);
                     break;
                 }
 
                 case "soil": {
                     SoilMeasurement soil = new SoilMeasurement();
-                    soil.setMoisture((int) value);
+                    soil.setValue((int) value);
+                    soil.setDeviceMac(deviceMac);
+                    soil.setOwnerId(userId);
+                    soil.setTimestamp(instant);
                     soilMeasurementRepository.save(soil);
-                    System.out.println("🌱 Zapisano Soil: " + value);
+                    System.out.println("Zapisano Soil: " + value + " @ " + instant);
                     break;
                 }
 
@@ -125,24 +105,46 @@ public class MeasurementService {
                     CoinEvent c = new CoinEvent();
                     c.setValue(value);
                     c.setDeviceMac(deviceMac);
+                    c.setOwnerId(userId);
+                    c.setTimestamp(instant);
                     coinEventRepository.save(c);
-                    System.out.println("🪙 Zapisano Monetę! Uruchamiam podlewanie...");
+                    System.out.println("Zapisano Monetę @ " + instant);
 
-                    // wysyłamy komendę podlewania
-                    String commandTopic = String.format("%s/%s/water", userMac, deviceMac);
-                    String commandPayload = "{\"command\": \"WATER_ON\", \"duration_sec\": 5}";
-                    mqttGateway.sendToMqtt(commandPayload, commandTopic);
+                    Optional<Device> deviceOpt = deviceRepository.findByMac(deviceMac);
 
-                    System.out.println("📤 Wysłano rozkaz na temat: " + commandTopic);
+                    if (deviceOpt.isPresent()) {
+                        Device device = deviceOpt.get();
+                        int maxAllowedMoisture = device.getSoilMax(); // np. 70%
+
+                        SoilMeasurement lastSoil = soilMeasurementRepository.findTopByDeviceMacOrderByTimestampDesc(deviceMac);
+
+                        if (lastSoil == null || lastSoil.getValue() < maxAllowedMoisture) {
+                            sendWaterCommand(userId, deviceMac, 1.0);
+                        } else {
+                            System.out.println("BLOKADA PODLEWANIA: Wilgotność " + lastSoil.getValue() +
+                                    "% jest wyższa niż limit " + maxAllowedMoisture + "%. Nie przelewamy rośliny.");
+                        }
+                    } else {
+                        System.out.println("Nie znaleziono urządzenia w bazie, wykonuję standardowe podlewanie.");
+                        sendWaterCommand(userId, deviceMac, 1.0);
+                    }
                     break;
                 }
 
                 default:
-                    System.out.println("⚠️ Nieznany typ sensora: " + sensorType);
+                    System.out.println("Nieznany typ sensora: " + sensorType);
             }
 
         } catch (Exception e) {
-            System.err.println("❌ Błąd przetwarzania MQTT: " + e.getMessage());
+            System.err.println("Błąd przetwarzania MQTT: " + e.getMessage());
         }
+    }
+
+    public void sendWaterCommand(String userId, String deviceMac, double duration) {
+        String commandTopic = String.format("%s/%s/water", userId, deviceMac);
+        String commandPayload = String.format("{\"command\": \"WATER_ON\", \"duration_sec\": %.1f}", duration);
+
+        mqttGateway.sendToMqtt(commandPayload, commandTopic);
+        System.out.println("Wysłano rozkaz podlewania na: " + commandTopic);
     }
 }

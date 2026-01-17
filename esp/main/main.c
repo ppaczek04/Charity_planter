@@ -1,254 +1,131 @@
-#include <stdio.h>
-#include <string.h>
+#include "esp_log.h"
+#include "nvs_flash.h"
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
-#include "esp_system.h"
-#include "esp_mac.h"
-#include "nvs_flash.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "mqtt_client.h"
-#include "esp_adc/adc_oneshot.h"
+#include "freertos/queue.h"
 
-// >>> ZMIANA (BMP280) - nowe include
-#include "driver/i2c.h"
-#include "bmp280.h"
-#include "esp_netif.h"
-#include <stdbool.h>
-////
+#include "nvs.h"    
+#include "soil_sensor.h"   
+#include "env_sensor.h"     
+#include "mqtt_manager.h"   
+#include "wifi_manager.h"   
+#include "pump_manager.h"  
+#include "ble_config.h" 
+#include "endstop_manager.h"
 
-/* --- KONFIGURACJA --- */
-#define WIFI_SSID        "A56Pio"
-#define WIFI_PASS        "siema123"
-#define MQTT_BROKER_URI  "mqtt://10.223.240.49:1883"   // IP twojego laptopa z Mosquitto
-#define TAG              "MQTT_SOIL"
+#define TAG "MAIN"
+#define BUTTON_GPIO 0 
 
-#define CZUJNIK_WILGOTNOSCI_CHANNEL ADC_CHANNEL_6  // GPIO34
+static QueueHandle_t water_cmd_queue = NULL;
 
+extern esp_err_t get_wifi_ssid(char *ssid, size_t ssid_size);
+extern esp_err_t get_broker_url(char *url, size_t url_size);
+extern uint32_t g_measurement_interval_ms;
+extern void load_measurement_interval(void);
 
-// >>> ZMIANA (BMP280) - konfiguracja I2C
-#define I2C_MASTER_SDA_IO 21
-#define I2C_MASTER_SCL_IO 22
-#define I2C_MASTER_NUM    I2C_NUM_0
-#define I2C_MASTER_FREQ   100000
-////
-
-/* --- GLOBALNE --- */
-esp_mqtt_client_handle_t mqtt_client;
-
-
-// >>> ZMIANA (BMP280) - globalny obiekt czujnika
-static bmp280_t bmp_dev;
-static bool bmp_ok = false;
-////
-
-
-#define TOPIC_SOIL        "sensors/esp32_1/soil"
-#define TOPIC_TEMPERATURE "sensors/esp32_1/temperature"
-#define TOPIC_PRESSURE    "sensors/esp32_1/pressure"
-
-
-
-/* --- Wi-Fi --- */
-static void wifi_init(void)
-{
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = WIFI_SSID,
-            .password = WIFI_PASS,
-        },
-    };
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_LOGI(TAG, "🔌 Łączenie z WiFi...");
-    esp_wifi_connect();
-}
-
-/* --- MQTT --- */
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
-{
-    switch (event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "✅ Połączono z brokerem MQTT");
-            break;
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGW(TAG, "⚠️ Rozłączono z brokerem MQTT");
-            break;
-        default:
-            break;
+static void handle_water_command(float duration_sec) {
+    if (water_cmd_queue != NULL) {
+        if (xQueueSend(water_cmd_queue, &duration_sec, 0) == pdTRUE) {
+            ESP_LOGI(TAG, "Komenda podlewania dodana do kolejki (%.1fs)", duration_sec);
+        } else {
+            ESP_LOGW(TAG, "Kolejka podlewania pełna! Ignoruję komendę.");
+        }
     }
 }
 
-static void mqtt_init(void)
-{
-    esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = MQTT_BROKER_URI,
-    };
-    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(mqtt_client);
+void pump_worker_task(void *arg) {
+    float duration;
+
+    while (1) {
+        if (xQueueReceive(water_cmd_queue, &duration, portMAX_DELAY)) {
+            
+            ESP_LOGI(TAG, "ROZPOCZYNAM PODLEWANIE Z KOLEJKI (%.1fs)", duration);
+            
+            pump_turn_on();
+            
+            vTaskDelay(pdMS_TO_TICKS((int)(duration * 1000)));
+            
+            pump_turn_off();
+            vTaskDelay(pdMS_TO_TICKS(2500)); 
+        }
+    }
 }
 
-// >>> ZMIANA (BMP280) - init I2C
-static void i2c_master_init(void)
-{
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ,
-        .clk_flags = 0,
-    };
-    ESP_ERROR_CHECK(i2c_param_config(I2C_MASTER_NUM, &conf));
-    ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, conf.mode, 0, 0, 0));
+void button_watch_task(void *arg) {
+    bool already_pressed = false;
+    while (1) {
+        if (gpio_get_level(BUTTON_GPIO) == 0) {
+            vTaskDelay(pdMS_TO_TICKS(50)); 
+            if (gpio_get_level(BUTTON_GPIO) == 0 && !already_pressed) {
+                ESP_LOGW(TAG, "TRYB SZYBKIEJ EDYCJI (Czasowe BLE)");
+                ble_config_start(false); 
+                already_pressed = true;
+            }
+        } else {
+            already_pressed = false;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 }
 
-// >>> ZMIANA (BMP280) - init BMP280
-static void bmp280_setup(void)
-{
-    i2c_master_init();
+void sensor_reading_task(void *arg) {
+    while (1) {
+        int soil = soil_sensor_get_percentage();
+        float temp = 0.0f, press = 0.0f;
+        env_sensor_read(&temp, &press);
 
-    esp_err_t res = bmp280_init(&bmp_dev, I2C_MASTER_NUM, BMP280_I2C_ADDR_0);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "❌ BMP280 init nieudany (sprawdź kable / adres 0x76 vs 0x77)");
-        bmp_ok = false;
+        mqtt_send_sensor_data(soil, temp, press);
+
+        vTaskDelay(pdMS_TO_TICKS(g_measurement_interval_ms));
+    }
+}
+
+void app_main(void) {
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        nvs_flash_init();
+    }
+
+    load_measurement_interval();
+    water_cmd_queue = xQueueCreate(10, sizeof(float));
+    if (water_cmd_queue == NULL) {
+        ESP_LOGE(TAG, "Błąd tworzenia kolejki!");
         return;
     }
 
-    bmp280_set_iir_filter(&bmp_dev, BMP280_FILTER_OFF);
-    bmp280_set_standby_time(&bmp_dev, BMP280_STANDBY_1000_MS);
-    bmp280_set_temp_oversampling(&bmp_dev, BMP280_OS_2X);
-    bmp280_set_press_oversampling(&bmp_dev, BMP280_OS_16X);
-    bmp280_set_mode(&bmp_dev, BMP280_MODE_NORMAL);
+    gpio_reset_pin(BUTTON_GPIO);
+    gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
 
-    bmp_ok = true;
-    ESP_LOGI(TAG, "✅ BMP280 gotowy (temperatura + ciśnienie)");
-}
-////
-
-static void mqtt_publish_value(const char *topic, float value)
-{
-    char payload[64];
-    snprintf(payload, sizeof(payload), "{\"value\": %.2f}", value);
-
-    esp_mqtt_client_publish(
-        mqtt_client,
-        topic,
-        payload,
-        0,
-        1,
-        0
-    );
-
-    ESP_LOGI("MQTT", "Wysłano → %s : %s", topic, payload);
-}
-
-
-
-//* --- Zadanie odczytu wilgotności gleby + BMP280 --- */
-static void soil_moisture_task(void *pvParameter)
-{
-    adc_oneshot_unit_handle_t adc_handle;
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = ADC_UNIT_1,
-    };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
-
-    adc_oneshot_chan_cfg_t config = {
-        .atten = ADC_ATTEN_DB_11,          // 0–3.3V
-        .bitwidth = ADC_BITWIDTH_DEFAULT,  // 12-bit
-    };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(
-        adc_handle,
-        CZUJNIK_WILGOTNOSCI_CHANNEL,
-        &config
-    ));
-
-    int raw_value;
-
-    ESP_LOGI(TAG, "🌱 Start pomiarów: soil + temperature + pressure");
-
-    while (1) {
-
-        /* --- Odczyt wilgotności gleby --- */
-        ESP_ERROR_CHECK(
-            adc_oneshot_read(adc_handle,
-                             CZUJNIK_WILGOTNOSCI_CHANNEL,
-                             &raw_value)
-        );
-
-        int wilgotnosc_proc = 100 - (raw_value * 100 / 4095);
-
-        /* --- Odczyt BMP280 --- */
-        float temp_c = 0.0f;
-        float pres_pa = 0.0f;
-        float pres_hpa = 0.0f;
-        bool bmp_read_ok = false;
-
-        if (bmp_ok && bmp280_read_float(&bmp_dev, &temp_c, &pres_pa) == ESP_OK) {
-            pres_hpa = pres_pa / 100.0f;
-            bmp_read_ok = true;
-
-            ESP_LOGI(TAG,
-                     "🌱 %d%% | 🌡️ %.2f C | 🧭 %.2f hPa",
-                     wilgotnosc_proc, temp_c, pres_hpa);
-        } else {
-            ESP_LOGW(TAG,
-                     "⚠️ BMP280: brak odczytu (wysyłam tylko soil)");
-            ESP_LOGI(TAG,
-                     "🌱 %d%%",
-                     wilgotnosc_proc);
-        }
-
-        /* --- Publikacja MQTT (ELEGANCKO) --- */
-        if (mqtt_client) {
-
-            mqtt_publish_value(TOPIC_SOIL, wilgotnosc_proc);
-
-            if (bmp_read_ok) {
-                mqtt_publish_value(TOPIC_TEMPERATURE, temp_c);
-                mqtt_publish_value(TOPIC_PRESSURE, pres_hpa);
-            }
-
-            ESP_LOGI(TAG, "📤 MQTT: soil / temperature / pressure wysłane");
-
-        } else {
-            ESP_LOGW(TAG, "⚠️ mqtt_client == NULL (nie wysłano)");
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(5000)); // co 5 sekund
+    if (gpio_get_level(BUTTON_GPIO) == 0) {
+        ESP_LOGW(TAG, "TRYB GŁÓWNEJ KONFIGURACJI (Permanentny)");
+        ble_config_start(true);
+        while(1) vTaskDelay(pdMS_TO_TICKS(1000));
     }
-}
 
-/* --- main() --- */
-void app_main(void)
-{
-    // Inicjalizacja pamięci NVS (konieczna dla WiFi)
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+    ESP_LOGI(TAG, "START SYSTEMU (Tryb Normalny)");
+
+    char check_ssid[32] = {0};
+    if (get_wifi_ssid(check_ssid, sizeof(check_ssid)) != ESP_OK || strlen(check_ssid) == 0) {
+        ESP_LOGE(TAG, "BRAK DANYCH WIFI! Kliknij przycisk BOOT, aby skonfigurować.");
     }
-    ESP_ERROR_CHECK(ret);
 
-    wifi_init();
-    mqtt_init();
+    soil_sensor_init();
+    env_sensor_init();
+    pump_manager_init();
+    endstop_manager_init(); 
+    
+    wifi_manager_init();
+    mqtt_manager_init();
 
-    // >>> ZMIANA (BMP280) - init BMP280 przed startem taska
-    bmp280_setup();
+    set_water_command_callback(handle_water_command);
 
-    // Uruchom zadanie odczytu i publikacji wilgotności
-    xTaskCreate(soil_moisture_task, "soil_moisture_task", 4096, NULL, 5, NULL);
+    xTaskCreate(button_watch_task, "btn_task", 2048, NULL, 10, NULL);
+    xTaskCreate(sensor_reading_task, "sensor_task", 4096, NULL, 5, NULL);
+    
+    xTaskCreate(pump_worker_task, "pump_worker", 2048, NULL, 5, NULL);
+
+    vTaskDelete(NULL);
 }

@@ -3,20 +3,26 @@
 
 #include <stdbool.h>
 
-extern volatile bool is_wifi_connected;
-extern char user_mac[18];
-extern char device_mac[18];
+extern uint32_t g_measurement_interval_ms;
+#define DEFAULT_INTERVAL_MS 5000
 
-// Tagi logów
-extern const char *MQTT_TAG;
+#define TOPIC_SUFFIX_CONFIG       "config"
+#define TOPIC_SUFFIX_WATER        "water"
+#define TOPIC_SUFFIX_SOIL         "soil"
+#define TOPIC_SUFFIX_TEMP         "temperature"
+#define TOPIC_SUFFIX_PRESS        "pressure"
+#define TOPIC_SUFFIX_COIN         "coin_inserted"
 
-// Tematy WYSYŁANIA (Publish)
-#define TEMPERATURE_TOPIC   "%s/%s/temperature"
-#define PRESSURE_TOPIC      "%s/%s/pressure"
-#define SOIL_HUMIDITY_TOPIC "%s/%s/soil_humidity"
-#define COIN_EVENT_TOPIC    "%s/%s/coin_inserted" 
+#define NVS_NS_SOIL       "soil_buf"
+#define NVS_NS_TEMP       "temp_buf"
+#define NVS_NS_PRESS      "press_buf"
+#define NVS_NS_COIN       "coin_buf"
 
-// Temat ODBIERANIA (Subscribe) - Tutaj Backend wysyła rozkaz
-#define WATER_CMD_TOPIC     "%s/%s/water" 
+enum Parameter {
+    SOIL_HUMIDITY,
+    TEMPERATURE,
+    PRESSURE,
+    COIN_INSERTED
+};
 
 #endif

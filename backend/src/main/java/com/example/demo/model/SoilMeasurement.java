@@ -6,28 +6,25 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "soil_measurements")
-@Data // Lombok tworzy gettery, settery, toString automatycznie
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class SoilMeasurement {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // Bezpieczniejsze ID
+    private Long id;
+
+    @Column(name = "reading_value", nullable = false)
+    private Integer value;
 
     @Column(nullable = false)
     private Instant timestamp;
 
     @Column(nullable = false)
-    private Integer moisture;
+    private String deviceMac;
 
-    private Double temperature;
-    private Double pressure;
-
-    @PrePersist
-    public void prePersist() {
-        if (timestamp == null) {
-            timestamp = Instant.now();
-        }
-    }
+    @Column(name = "owner_id", nullable = false)
+    private String ownerId;
 }
+

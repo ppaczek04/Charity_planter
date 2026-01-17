@@ -6,14 +6,24 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "coin_events")
-@Data @NoArgsConstructor @AllArgsConstructor
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class CoinEvent {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "reading_value")
-    private Double value; // Np. nominał monety (1.0)
+
+    @Column(name = "reading_value", nullable = false)
+    private Double value;
+
+    @Column(nullable = false)
     private Instant timestamp;
+
+    @Column(nullable = false)
     private String deviceMac;
 
-    @PrePersist void prePersist() { if (timestamp == null) timestamp = Instant.now(); }
+    @Column(name = "owner_id", nullable = false)
+    private String ownerId;
 }
