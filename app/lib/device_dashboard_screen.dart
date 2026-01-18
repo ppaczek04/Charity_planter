@@ -15,6 +15,9 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
 
   int _selectedIndex = 0;
 
+  // Stats tab state
+  int _selectedStatsTab = 0; // 0=Temp, 1=Ciśnienie, 2=Gleba, 3=Monety
+
   // Placeholder settings state
   bool _vacationMode = false; // saved/applied
   bool _vacationModeDraft = false; // edited in Settings, applied on Save
@@ -39,6 +42,9 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
 
     // Initialize draft values from saved state.
     _vacationModeDraft = _vacationMode;
+    _measurementIntervalSecondsController.text = '5';
+    _dryThresholdController.text = '30';
+    _stopThresholdController.text = '70';
   }
 
   @override
@@ -108,12 +114,27 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
   }
 
   Widget _statsTab() {
+    final statsLabels = ['Temp', 'Ciśnienie', 'Gleba', 'Monety'];
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Statystyki',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Statystyki',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Odświeżanie danych...')),
+                );
+              },
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Card(
@@ -126,13 +147,69 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   'Historia pomiarów (ostatnie 24h)',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
-                SizedBox(height: 12),
-                Text('Brak pomiarów w tym okresie.'),
+                const SizedBox(height: 12),
+                // Zakładki
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: List.generate(
+                      statsLabels.length,
+                      (i) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(statsLabels[i]),
+                          selected: _selectedStatsTab == i,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() => _selectedStatsTab = i);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Header
+                const Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'DATA I CZAS',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'WARTOŚĆ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Content
+                Text(
+                  'Brak pomiarów w tym okresie.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.black45),
+                ),
               ],
             ),
           ),
@@ -342,7 +419,11 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
                     Expanded(
                       child: TextField(
                         controller: _stopThresholdController,
@@ -438,18 +519,20 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: _tabBody(),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: _tabBody(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
