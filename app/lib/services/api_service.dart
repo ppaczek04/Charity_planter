@@ -45,6 +45,30 @@ class ApiService {
 
   static const Duration _requestTimeout = Duration(seconds: 8);
 
+  // Klucze w pamięci telefonu
+  // - user: minimalny obiekt użytkownika (id/email/username)
+  // - auth_token: legacy (zostawiamy, bo część kodu historycznie tego używała)
+  static const String _userKey = 'user';
+  static const String _tokenKey = 'auth_token';
+
+  /// Normalizujemy usera tak, żeby nie zapisywać w telefonie wrażliwych danych.
+  /// Backend w tym projekcie potrafi zwrócić cały obiekt User.
+  static Map<String, dynamic> _normalizeUserJson(Map<String, dynamic> json) {
+    return {
+      'id': json['id']?.toString(),
+      'email': json['email']?.toString(),
+      'username': json['username']?.toString(),
+    };
+  }
+
+  /// Pobiera aktualnie zalogowanego usera z telefonu.
+  static Future<Map<String, dynamic>?> getCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userStr = prefs.getString(_userKey);
+    if (userStr == null || userStr.isEmpty) return null;
+    return jsonDecode(userStr) as Map<String, dynamic>;
+  }
+
   /// Walidacja formatu email
   /// Zwraca: true jeśli email ma poprawny format, false w przeciwnym razie
   static bool isValidEmail(String email) {
@@ -106,8 +130,12 @@ class ApiService {
   /// [email] - email użytkownika
   /// [password] - hasło
   /// 
-  /// Zwraca: token JWT jeśli logowanie się powiodło, lub null jeśli błąd
-  static Future<String?> login({
+  /// Zwraca: obiekt user (Map) jeśli logowanie się powiodło, lub null jeśli błąd
+  ///
+  /// Uwaga: backend w tym projekcie zwraca obiekt User jako JSON.
+  /// My zapisujemy minimalne dane usera w SharedPreferences, żeby potem pobierać
+  /// urządzenia dla tego użytkownika.
+  static Future<Map<String, dynamic>?> login({
     required String email,
     required String password,
   }) async {
@@ -129,16 +157,27 @@ class ApiService {
       )
           .timeout(_requestTimeout);
 
-      // Jeśli sukces (200) to backend zwraca token
+      // Jeśli sukces (200)
       if (response.statusCode == 200) {
-        // Backend zwraca token w body
-        final token = response.body;
-        
-        // Zapisujemy token w SharedPreferences (lokalnie na telefonie)
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
-        
-        return token;
+
+        // Legacy: nadal zapisujemy body do auth_token, żeby nie psuć starego flow.
+        await prefs.setString(_tokenKey, response.body);
+
+        // Spróbuj sparsować JSON usera.
+        // Jeśli backend zwraca coś innego (np. token), to nie będziemy mieli userId
+        // i wtedy lista urządzeń nie zadziała – pokażemy to w UI.
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final user = _normalizeUserJson(decoded);
+          if (user['id'] != null) {
+            await prefs.setString(_userKey, jsonEncode(user));
+          }
+          return user;
+        }
+
+        // Nieoczekiwany format
+        return null;
       } else {
         // Jeśli błąd logowania (401 = unauthorized)
         print('Login error: ${response.body}');
@@ -151,15 +190,48 @@ class ApiService {
     }
   }
 
-  /// Pobranie zapisanego tokenu z telefonu
+  /// Pobranie zapisanego tokenu z telefonu (legacy)
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    return prefs.getString(_tokenKey);
   }
 
   /// Wylogowanie (usunięcie tokenu z telefonu)
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
+    await prefs.remove(_tokenKey);
+    await prefs.remove(_userKey);
+  }
+
+  /// Pobierz listę urządzeń użytkownika
+  /// Endpoint backendu: GET /api/devices/user/{userId}
+  static Future<List<Map<String, dynamic>>> getUserDevices({
+    required String userId,
+  }) async {
+    try {
+      final response = await http
+          .get(
+            await _uri('/devices/user/$userId'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded
+              .whereType<Map<String, dynamic>>()
+              .toList(growable: false);
+        }
+      }
+
+      print('Get devices error: ${response.statusCode} ${response.body}');
+      return [];
+    } catch (e) {
+      print('Get devices exception: $e');
+      throw Exception('Nie udało się pobrać urządzeń. ($e)');
+    }
   }
 }

@@ -174,13 +174,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           Future.delayed(const Duration(milliseconds: 500), () async {
             if (mounted) {
               // Wysyłamy żądanie logowania
-              final token = await ApiService.login(
+              final user = await ApiService.login(
                 email: email,
                 password: password,
               );
 
               // Jeśli logowanie się powiodło
-              if (token != null && mounted) {
+              if (user != null && user['id'] != null && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Zalogowano pomyślnie!')),
                 );

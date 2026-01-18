@@ -2,13 +2,41 @@ import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'login_screen.dart';
 
-class DevicesListScreen extends StatelessWidget {
+class DevicesListScreen extends StatefulWidget {
   const DevicesListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<String> devices = ['Doniczka 1', 'Doniczka 2'];
+  State<DevicesListScreen> createState() => _DevicesListScreenState();
+}
 
+class _DevicesListScreenState extends State<DevicesListScreen> {
+  Future<List<Map<String, dynamic>>>? _devicesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _devicesFuture = _loadDevices();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadDevices() async {
+    final user = await ApiService.getCurrentUser();
+    final userId = user?['id'] as String?;
+
+    if (userId == null || userId.isEmpty) {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+      return [];
+    }
+
+    return ApiService.getUserDevices(userId: userId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -41,14 +69,85 @@ class DevicesListScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: ListView.builder(
-          itemCount: devices.length + 1,
-          itemBuilder: (context, index) {
-            if (index == devices.length) {
-              return _buildAddDeviceButton();
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _devicesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
             }
 
-            return _buildDeviceCard(devices[index]);
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Błąd pobierania urządzeń: ${snapshot.error}'),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _devicesFuture = _loadDevices();
+                        });
+                      },
+                      child: const Text('Spróbuj ponownie'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final devices = snapshot.data ?? [];
+
+            if (devices.isEmpty) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Nie masz jeszcze żadnych doniczek.',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Dodaj urządzenie, żeby rozpocząć.'),
+                  const SizedBox(height: 20),
+                  _buildAddDeviceButton(),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _devicesFuture = _loadDevices();
+                      });
+                    },
+                    child: const Text('Odśwież'),
+                  ),
+                ],
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  _devicesFuture = _loadDevices();
+                });
+                await _devicesFuture;
+              },
+              child: ListView.builder(
+                itemCount: devices.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == devices.length) {
+                    return _buildAddDeviceButton();
+                  }
+
+                  final dev = devices[index];
+                  final name = (dev['name'] as String?)?.trim();
+                  final mac = (dev['mac'] as String?)?.trim();
+
+                  return _buildDeviceCard(
+                    name: (name == null || name.isEmpty) ? 'Bez nazwy' : name,
+                    mac: mac ?? '-',
+                  );
+                },
+              ),
+            );
           },
         ),
       ),
@@ -83,7 +182,7 @@ class DevicesListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDeviceCard(String name) {
+  Widget _buildDeviceCard({required String name, required String mac}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -93,7 +192,7 @@ class DevicesListScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
-          print("Kliknięto $name");
+          print("Kliknięto $name ($mac)");
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -114,11 +213,23 @@ class DevicesListScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'MAC: $mac',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
                 ),
               ),
             ],

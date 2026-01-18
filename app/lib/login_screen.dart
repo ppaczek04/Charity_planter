@@ -201,14 +201,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // Wysyłamy żądanie logowania do backendu (funkcja z ApiService)
-      final token = await ApiService.login(
+      final user = await ApiService.login(
         email: email,
         password: password,
       );
 
       // Sprawdzamy czy logowanie się powiodło
-      if (token != null) {
-        // Sukces - token został zapisany w SharedPreferences
+      if (user != null && user['id'] != null) {
+        // Sukces - user został zapisany w SharedPreferences
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Zalogowano pomyślnie!')),
