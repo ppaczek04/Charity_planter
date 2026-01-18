@@ -15,10 +15,17 @@ const WateringView = ({ deviceId, isHolidayMode }: WateringViewProps) => {
         setLoading(true);
         try {
             await api.post(`/devices/${deviceId}/water`, { duration: duration });
-            alert(`Podlano roślinę!`);
-        } catch (error) {
+            
+            alert(`Sukces! Doniczka podlana.`);
+            
+        } catch (error: any) {
             console.error("Błąd:", error);
-            alert("Nie udało się wysłać komendy.");
+            
+            if (error.response && error.response.status === 504) {
+                 alert("Błąd: Urządzenie nie odpowiada! Sprawdź, czy doniczka jest podłączona do prądu.");
+            } else {
+                 alert("Nie udało się wysłać komendy.");
+            }
         } finally {
             setLoading(false);
         }
