@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'device_dashboard_screen.dart';
 import 'services/api_service.dart';
 import 'login_screen.dart';
 
@@ -142,6 +143,7 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
                   final mac = (dev['mac'] as String?)?.trim();
 
                   return _buildDeviceCard(
+                    device: dev,
                     name: (name == null || name.isEmpty) ? 'Bez nazwy' : name,
                     mac: mac ?? '-',
                   );
@@ -182,7 +184,11 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
     );
   }
 
-  Widget _buildDeviceCard({required String name, required String mac}) {
+  Widget _buildDeviceCard({
+    required Map<String, dynamic> device,
+    required String name,
+    required String mac,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -191,8 +197,18 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
       ),
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          print("Kliknięto $name ($mac)");
+        onTap: () async {
+          final updatedName = await Navigator.of(context).push<String>(
+            MaterialPageRoute(
+              builder: (context) => DeviceDashboardScreen(device: device),
+            ),
+          );
+
+          if (updatedName == null || updatedName.trim().isEmpty) return;
+
+          setState(() {
+            device['name'] = updatedName.trim();
+          });
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
