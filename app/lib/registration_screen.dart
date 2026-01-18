@@ -217,7 +217,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // Jeśli coś poszło nie tak - pokazujemy error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd: $e')),
+          SnackBar(content: Text(e.toString())),
         );
       }
     } finally {
