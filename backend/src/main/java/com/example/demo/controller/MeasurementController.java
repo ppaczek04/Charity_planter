@@ -131,9 +131,13 @@ public class MeasurementController {
                     if (duration > 5.0) duration = 5.0;
                     if (duration < 0.5) duration = 0.5;
 
-                    measurementService.sendWaterCommand(device.getOwnerId(), device.getMac(), duration);
+                    boolean success = measurementService.triggerWateringAndWait(device.getOwnerId(), device.getMac(), duration);
 
-                    return ResponseEntity.ok("Komenda podlewania wysłana.");
+                    if (success) {
+                        return ResponseEntity.ok("Podlano pomyślnie (potwierdzone przez urządzenie).");
+                    } else {
+                        return ResponseEntity.status(504).body("Urządzenie nie odpowiada (Offline). Sprawdź zasilanie.");
+                    }
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

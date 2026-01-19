@@ -46,7 +46,7 @@ public class MqttConfig {
         String clientId = "backend-sub-" + UUID.randomUUID().toString();
 
         MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(clientId, clientFactory, "+/+/+");
+                new MqttPahoMessageDrivenChannelAdapter(clientId, clientFactory, "+/+/+", "+/+/water/ack", "+/+/config/ack");
 
         adapter.setQos(1);
         adapter.setConverter(new DefaultPahoMessageConverter());

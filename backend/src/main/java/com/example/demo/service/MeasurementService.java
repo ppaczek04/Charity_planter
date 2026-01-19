@@ -8,6 +8,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class MeasurementService {
@@ -19,6 +23,8 @@ public class MeasurementService {
     private final DeviceRepository deviceRepository;
     private final ObjectMapper objectMapper;
     private final MqttGateway mqttGateway;
+    private final ConcurrentHashMap<String, CompletableFuture<Boolean>> pendingWateringRequests = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<Boolean>> pendingConfigRequests = new ConcurrentHashMap<>();
 
     public MeasurementService(
             TemperatureRepository temperatureRepository,
@@ -38,6 +44,50 @@ public class MeasurementService {
         this.mqttGateway = mqttGateway;
     }
 
+    public boolean updateConfigAndWait(String userId, String deviceMac, int interval) {
+        String topic = String.format("%s/%s/config", userId, deviceMac);
+        String payload = String.format("{\"interval\": %d}", interval);
+
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        pendingConfigRequests.put(deviceMac, future);
+
+        try {
+            mqttGateway.sendToMqtt(payload, topic);
+            System.out.println("Wysłano nowy config do " + deviceMac + ", czekam na ACK...");
+
+            return future.get(4, TimeUnit.SECONDS);
+
+        } catch (Exception e) {
+            System.out.println("Błąd/Timeout konfiguracji dla " + deviceMac);
+            return false;
+        } finally {
+            pendingConfigRequests.remove(deviceMac);
+        }
+    }
+
+    public boolean triggerWateringAndWait(String userId, String deviceMac, double duration) {
+        String commandTopic = String.format("%s/%s/water", userId, deviceMac);
+        String payload = String.format("{\"command\": \"WATER_ON\", \"duration_sec\": %.1f}", duration);
+
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        pendingWateringRequests.put(deviceMac, future);
+
+        try {
+            mqttGateway.sendToMqtt(payload, commandTopic);
+            System.out.println("Czekam na potwierdzenie od: " + deviceMac);
+
+            return future.get(8, TimeUnit.SECONDS);
+
+        } catch (TimeoutException e) {
+            System.out.println("Timeout! Urządzenie " + deviceMac + " nie odpowiedziało.");
+            return false;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            pendingWateringRequests.remove(deviceMac);
+        }
+    }
+
     public void processMessage(String topic, String payload) {
         try {
             // topic: user_mac/device_mac/sensor
@@ -50,6 +100,26 @@ public class MeasurementService {
             String userId = parts[0];
             String deviceMac = parts[1];
             String sensorType = parts[2];
+
+            if (topic.endsWith("/water/ack")) {
+                System.out.println("Otrzymano ACK od " + deviceMac);
+
+                CompletableFuture<Boolean> future = pendingWateringRequests.get(deviceMac);
+                if (future != null) {
+                    future.complete(true);
+                }
+                return;
+            }
+
+            if (topic.endsWith("/config/ack")) {
+                System.out.println("Otrzymano CONFIG ACK od " + deviceMac);
+
+                CompletableFuture<Boolean> future = pendingConfigRequests.get(deviceMac);
+                if (future != null) {
+                    future.complete(true);
+                }
+                return;
+            }
 
             if ("water".equals(sensorType)) {
                 return;
