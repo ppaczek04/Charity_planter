@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/api_service.dart';
 
 class DeviceDashboardScreen extends StatefulWidget {
   final Map<String, dynamic> device;
@@ -12,15 +13,22 @@ class DeviceDashboardScreen extends StatefulWidget {
 class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
   late String _deviceName;
   late String _deviceMac;
+  late String _deviceOwnerId;
+  late int _deviceId;
 
   int _selectedIndex = 0;
 
   // Stats tab state
   int _selectedStatsTab = 0; // 0=Temp, 1=Ciśnienie, 2=Gleba, 3=Monety
+  List<Map<String, dynamic>> _statsData = [];
+  bool _statsLoading = false;
 
   // Placeholder settings state
   bool _vacationMode = false; // saved/applied
   bool _vacationModeDraft = false; // edited in Settings, applied on Save
+  bool _isSavingSettings = false;
+  bool _isWatering = false;
+  
   final TextEditingController _manualWaterSecondsController =
       TextEditingController(text: '1');
   final TextEditingController _measurementIntervalSecondsController =
@@ -36,15 +44,22 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
 
     final name = (widget.device['name'] as String?)?.trim();
     final mac = (widget.device['mac'] as String?)?.trim();
+    final ownerId = widget.device['ownerId'] as String?;
+    final id = widget.device['id'] as int?;
 
     _deviceName = (name == null || name.isEmpty) ? 'Bez nazwy' : name;
     _deviceMac = mac ?? '-';
+    _deviceOwnerId = ownerId ?? '';
+    _deviceId = id ?? 0;
 
     // Initialize draft values from saved state.
     _vacationModeDraft = _vacationMode;
     _measurementIntervalSecondsController.text = '5';
     _dryThresholdController.text = '30';
     _stopThresholdController.text = '70';
+    
+    // Load measurements on init
+    _loadMeasurements();
   }
 
   @override
@@ -54,6 +69,120 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     _dryThresholdController.dispose();
     _stopThresholdController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMeasurements() async {
+    if (_statsLoading) return;
+    
+    setState(() => _statsLoading = true);
+    try {
+      List<Map<String, dynamic>> data = [];
+      
+      switch (_selectedStatsTab) {
+        case 0: // Temp
+          data = await ApiService.getTemperatures(
+            deviceMac: _deviceMac,
+            ownerId: _deviceOwnerId,
+          );
+          break;
+        case 1: // Ciśnienie
+          data = await ApiService.getPressures(
+            deviceMac: _deviceMac,
+            ownerId: _deviceOwnerId,
+          );
+          break;
+        case 2: // Gleba
+          data = await ApiService.getSoilMeasurements(
+            deviceMac: _deviceMac,
+            ownerId: _deviceOwnerId,
+          );
+          break;
+        case 3: // Monety
+          data = await ApiService.getCoinEvents(
+            deviceMac: _deviceMac,
+            ownerId: _deviceOwnerId,
+          );
+          break;
+      }
+      
+      if (mounted) {
+        setState(() => _statsData = data);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd pobierania danych: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _statsLoading = false);
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    final interval = int.tryParse(_measurementIntervalSecondsController.text) ?? 5;
+    final soilMin = int.tryParse(_dryThresholdController.text) ?? 30;
+    final soilMax = int.tryParse(_stopThresholdController.text) ?? 70;
+    
+    if (soilMin >= soilMax) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Próg minimalny musi być mniejszy od maksymalnego!')),
+      );
+      return;
+    }
+
+    setState(() => _isSavingSettings = true);
+    try {
+      await ApiService.updateDeviceSettings(
+        deviceId: _deviceId,
+        interval: interval,
+        holidayMode: _vacationModeDraft,
+        soilMin: soilMin,
+        soilMax: soilMax,
+      );
+      
+      setState(() => _vacationMode = _vacationModeDraft);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Zapisano konfigurację.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd zapisu: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingSettings = false);
+    }
+  }
+  
+  Future<void> _waterNow() async {
+    final duration = double.tryParse(_manualWaterSecondsController.text) ?? 1.0;
+    
+    setState(() => _isWatering = true);
+    try {
+      await ApiService.waterDevice(
+        deviceId: _deviceId,
+        duration: duration,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Podlano roślinę!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd podlewania: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isWatering = false);
+    }
   }
 
   Future<void> _editDeviceName() async {
@@ -102,17 +231,6 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     );
   }
 
-  void _saveSettings() {
-    setState(() {
-      // Apply edited values only on Save.
-      _vacationMode = _vacationModeDraft;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Zapisano konfigurację (placeholder).')),
-    );
-  }
-
   Widget _statsTab() {
     final statsLabels = ['Temp', 'Ciśnienie', 'Gleba', 'Monety'];
     
@@ -128,11 +246,7 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Odświeżanie danych...')),
-                );
-              },
+              onPressed: _statsLoading ? null : _loadMeasurements,
             ),
           ],
         ),
@@ -165,8 +279,9 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                           label: Text(statsLabels[i]),
                           selected: _selectedStatsTab == i,
                           onSelected: (selected) {
-                            if (selected) {
+                            if (selected && !_statsLoading) {
                               setState(() => _selectedStatsTab = i);
+                              _loadMeasurements();
                             }
                           },
                         ),
@@ -205,11 +320,52 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                 ),
                 const SizedBox(height: 12),
                 // Content
-                Text(
-                  'Brak pomiarów w tym okresie.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black45),
-                ),
+                if (_statsLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  )
+                else if (_statsData.isEmpty)
+                  Text(
+                    'Brak pomiarów w tym okresie.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.black45),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _statsData.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final item = _statsData[i];
+                      final timestamp = item['timestamp'] as String?;
+                      final value = item['value']?.toString() ?? '-';
+                      
+                      String displayTime = '-';
+                      if (timestamp != null) {
+                        try {
+                          final dt = DateTime.parse(timestamp);
+                          displayTime = '${dt.day}.${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+                        } catch (_) {}
+                      }
+                      
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text(displayTime)),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(value),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
           ),
@@ -312,16 +468,18 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                       ),
                       const SizedBox(height: 12),
                       FilledButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Podlej teraz (placeholder).'),
-                            ),
-                          );
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text('Podlej teraz'),
+                        onPressed: _isWatering ? null : _waterNow,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: _isWatering
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Podlej teraz'),
                         ),
                       ),
                     ],
@@ -441,8 +599,19 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: FilledButton(
-                    onPressed: _saveSettings,
-                    child: const Text('Zapisz konfigurację'),
+                    onPressed: _isSavingSettings ? null : _saveSettings,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: _isSavingSettings
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Zapisz konfigurację'),
+                    ),
                   ),
                 ),
               ],

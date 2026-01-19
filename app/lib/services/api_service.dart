@@ -234,4 +234,214 @@ class ApiService {
       throw Exception('Nie udało się pobrać urządzeń. ($e)');
     }
   }
+
+  /// Pobierz pomiary temperatury z ostatnich 24h
+  /// Endpoint backendu: GET /api/temperatures
+  static Future<List<Map<String, dynamic>>> getTemperatures({
+    required String deviceMac,
+    required String ownerId,
+  }) async {
+    try {
+      final from = DateTime.now()
+          .subtract(const Duration(hours: 24))
+          .toUtc()
+          .toIso8601String();
+      final uri = (await _uri('/temperatures')).replace(queryParameters: {
+        'deviceMac': deviceMac,
+        'ownerId': ownerId,
+        'from': from,
+      });
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get temperatures exception: $e');
+      return [];
+    }
+  }
+
+  /// Pobierz pomiary ciśnienia z ostatnich 24h
+  /// Endpoint backendu: GET /api/pressures
+  static Future<List<Map<String, dynamic>>> getPressures({
+    required String deviceMac,
+    required String ownerId,
+  }) async {
+    try {
+      final from = DateTime.now()
+          .subtract(const Duration(hours: 24))
+          .toUtc()
+          .toIso8601String();
+      final uri = (await _uri('/pressures')).replace(queryParameters: {
+        'deviceMac': deviceMac,
+        'ownerId': ownerId,
+        'from': from,
+      });
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get pressures exception: $e');
+      return [];
+    }
+  }
+
+  /// Pobierz pomiary wilgotności gleby z ostatnich 24h
+  /// Endpoint backendu: GET /api/soil-measurements
+  static Future<List<Map<String, dynamic>>> getSoilMeasurements({
+    required String deviceMac,
+    required String ownerId,
+  }) async {
+    try {
+      final from = DateTime.now()
+          .subtract(const Duration(hours: 24))
+          .toUtc()
+          .toIso8601String();
+      final uri = (await _uri('/soil-measurements')).replace(queryParameters: {
+        'deviceMac': deviceMac,
+        'ownerId': ownerId,
+        'from': from,
+      });
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get soil measurements exception: $e');
+      return [];
+    }
+  }
+
+  /// Pobierz zdarzenia monet z ostatnich 24h
+  /// Endpoint backendu: GET /api/coin-events
+  static Future<List<Map<String, dynamic>>> getCoinEvents({
+    required String deviceMac,
+    required String ownerId,
+  }) async {
+    try {
+      final from = DateTime.now()
+          .subtract(const Duration(hours: 24))
+          .toUtc()
+          .toIso8601String();
+      final uri = (await _uri('/coin-events')).replace(queryParameters: {
+        'deviceMac': deviceMac,
+        'ownerId': ownerId,
+        'from': from,
+      });
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get coin events exception: $e');
+      return [];
+    }
+  }
+
+  /// Wyślij komendę podlewania
+  /// Endpoint backendu: POST /api/devices/{deviceId}/water
+  static Future<void> waterDevice({
+    required int deviceId,
+    required double duration,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            await _uri('/devices/$deviceId/water'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'duration': duration}),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Błąd podlewania: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Nie udało się wysłać komendy podlewania. ($e)');
+    }
+  }
+
+  /// Zaktualizuj ustawienia urządzenia
+  /// Endpoint backendu: PUT /api/devices/{deviceId}/settings
+  static Future<void> updateDeviceSettings({
+    required int deviceId,
+    required int interval,
+    required bool holidayMode,
+    required int soilMin,
+    required int soilMax,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            await _uri('/devices/$deviceId/settings'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'interval': interval,
+              'holidayMode': holidayMode,
+              'soilMin': soilMin,
+              'soilMax': soilMax,
+            }),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Błąd aktualizacji ustawień: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Nie udało się zaktualizować ustawień. ($e)');
+    }
+  }
 }
