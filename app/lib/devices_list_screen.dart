@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'add_device_screen.dart';
 import 'device_dashboard_screen.dart';
 import 'services/api_service.dart';
 import 'login_screen.dart';
@@ -165,8 +166,18 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
       ),
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          print("Kliknięto Dodaj urządzenie");
+        onTap: () async {
+          final added = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (context) => const AddDeviceScreen(),
+            ),
+          );
+
+          if (added == true && mounted) {
+            setState(() {
+              _devicesFuture = _loadDevices();
+            });
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: const Padding(

@@ -41,6 +41,10 @@ dependencies:
   # SharedPreferences - do przechowywania tokenu JWT na telefonie
   shared_preferences: ^2.2.0
 
+  # BLE provisioning
+  flutter_blue_plus: ^1.35.3
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

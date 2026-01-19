@@ -387,6 +387,38 @@ class ApiService {
     }
   }
 
+  /// Przypisz / zarejestruj urządzenie dla użytkownika
+  /// Endpoint backendu: POST /api/devices/claim
+  static Future<void> claimDevice({
+    required String deviceMac,
+    required String userId,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            await _uri('/devices/claim'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'deviceMac': deviceMac.trim(),
+              'userId': userId,
+            }),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      }
+
+      throw Exception(
+        'Nie udało się dodać urządzenia: ${response.statusCode} ${response.body}',
+      );
+    } catch (e) {
+      throw Exception('Nie udało się dodać urządzenia. ($e)');
+    }
+  }
+
   /// Wyślij komendę podlewania
   /// Endpoint backendu: POST /api/devices/{deviceId}/water
   static Future<void> waterDevice({
