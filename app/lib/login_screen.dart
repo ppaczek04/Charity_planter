@@ -21,59 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   // Flaga czy wysyłka jest w trakcie (do pokazania loading spinner)
   bool _isLoading = false;
 
-  Future<void> _openApiSettings() async {
-    final current = await ApiService.getBaseUrl();
-    final controller = TextEditingController(text: current);
-
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Adres backendu (API URL)'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Podaj adres backendu.\n\n'
-                'Domyślnie działa pod USB (adb reverse): http://127.0.0.1:8080/api\n'
-                'Przy hotspot/WiFi: użyj IP LAPTOPA z ipconfig (nie IP telefonu).\n'
-                'Np. http://10.160.120.188:8080/api',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'API URL',
-                  hintText: 'http://127.0.0.1:8080/api',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Anuluj'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await ApiService.setBaseUrl(controller.text);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Zapisano adres backendu.')),
-                  );
-                }
-              },
-              child: const Text('Zapisz'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   void dispose() {
     // Ważne! Usuwamy kontrolery żeby nie było memory leak'u
@@ -93,10 +40,6 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: Colors.white,
         centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black),
-            onPressed: _isLoading ? null : _openApiSettings,
-          ),
           TextButton(
             onPressed: () {
               Navigator.push(
