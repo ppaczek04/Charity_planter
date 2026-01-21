@@ -27,6 +27,8 @@ static char topic_temp[128];
 static char topic_press[128];
 static char topic_coin[128];
 static char topic_config[128];
+static char topic_water_ack[128];
+static char topic_config_ack[128];
 
 static water_command_callback_t water_callback = NULL;
 
@@ -56,7 +58,7 @@ static void event_handler(void *handler_args, esp_event_base_t base, int32_t eve
     } else if (event_id == MQTT_EVENT_DATA) {
         ESP_LOGI(TAG, "Otrzymano wiadomość: %.*s na topiku %.*s", 
                  event->data_len, event->data, event->topic_len, event->topic);
-        
+ 
         if (strncmp(event->topic, topic_config, event->topic_len) == 0) {
             cJSON *json = cJSON_ParseWithLength(event->data, event->data_len);
             if (json) {
@@ -66,7 +68,11 @@ static void event_handler(void *handler_args, esp_event_base_t base, int32_t eve
                     if (new_seconds >= 5) { 
                         uint32_t new_ms = new_seconds * 1000;
                         save_measurement_interval(new_ms); 
-                        ESP_LOGI(TAG, "Zaktualizowano interwał pomiarów na: %d s", new_seconds);
+                        ESP_LOGI(TAG, "Zaktualizowano interwał: %d s", new_seconds);
+                        
+                        char *ack_payload = "{\"status\":\"OK\"}";
+                        esp_mqtt_client_publish(client, topic_config_ack, ack_payload, 0, 0, 0);
+                        ESP_LOGI(TAG, "Wysłano ACK na: %s", topic_config_ack);
                     }
                 }
                 cJSON_Delete(json);
@@ -91,6 +97,10 @@ static void event_handler(void *handler_args, esp_event_base_t base, int32_t eve
                     if (water_callback) {
                         water_callback(duration_sec);
                     }
+
+                    char *ack_payload = "{\"status\":\"OK\"}";
+                    esp_mqtt_client_publish(client, topic_water_ack, ack_payload, 0, 0, 0);
+                    ESP_LOGI(TAG, "Wysłano ACK na: %s", topic_water_ack);
                 }
                 cJSON_Delete(json);
             }
@@ -124,6 +134,8 @@ static void build_topics(void) {
     snprintf(topic_press, sizeof(topic_press), "%s/%s/%s", owner_id, mac_str, TOPIC_SUFFIX_PRESS);
     snprintf(topic_coin,  sizeof(topic_coin),  "%s/%s/%s", owner_id, mac_str, TOPIC_SUFFIX_COIN);
     snprintf(topic_config, sizeof(topic_config), "%s/%s/%s", owner_id, mac_str, TOPIC_SUFFIX_CONFIG);
+    snprintf(topic_water_ack, sizeof(topic_water_ack), "%s/%s/water/ack", owner_id, mac_str);
+    snprintf(topic_config_ack, sizeof(topic_config_ack), "%s/%s/config/ack", owner_id, mac_str);
 
     ESP_LOGI(TAG, "Zbudowano temat gleby: %s", topic_soil);
 }

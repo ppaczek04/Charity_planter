@@ -9,6 +9,7 @@ import com.example.demo.model.Device;
 import com.example.demo.repository.DeviceRepository;
 import com.example.demo.repository.TemperatureRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.service.MeasurementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,15 +26,13 @@ import java.util.Optional;
 public class DeviceController {
 
     private final DeviceRepository deviceRepository;
-    private final UserRepository userRepository;
     private final TemperatureRepository tempRepository;
-    private final MqttGateway mqttGateway;
+    private final MeasurementService measurementService;
 
-    public DeviceController(DeviceRepository deviceRepository, UserRepository userRepository, TemperatureRepository tempRepository, MqttGateway mqttGateway) {
+    public DeviceController(DeviceRepository deviceRepository, TemperatureRepository tempRepository, MeasurementService measurementService) {
         this.deviceRepository = deviceRepository;
-        this.userRepository = userRepository;
         this.tempRepository = tempRepository;
-        this.mqttGateway = mqttGateway;
+        this.measurementService = measurementService;
     }
 
     // POST /api/devices/claim
@@ -106,22 +105,32 @@ public class DeviceController {
     @PutMapping("/{deviceId}/settings")
     public ResponseEntity<?> updateSettings(@PathVariable Long deviceId, @RequestBody SettingsRequest request) {
         return deviceRepository.findById(deviceId)
-            .map(device -> {
-                if (request.getInterval() != null) device.setMeasurementInterval(request.getInterval());
-                if (request.getHolidayMode() != null) device.setHolidayMode(request.getHolidayMode());
-                if (request.getSoilMin() != null) device.setSoilMin(request.getSoilMin());
-                if (request.getSoilMax() != null) device.setSoilMax(request.getSoilMax());
+                .map(device -> {
 
-                deviceRepository.save(device);
+                    if (request.getInterval() != null) {
+                        if (request.getInterval() < 5) return ResponseEntity.badRequest().body("Min interval 5s");
 
-                if (request.getInterval() != null) {
-                    String topic = String.format("%s/%s/config", device.getOwnerId(), device.getMac());
-                    String payload = String.format("{\"interval\": %d}", request.getInterval());
-                    mqttGateway.sendToMqtt(payload, topic);
-                }
+                        boolean success = measurementService.updateConfigAndWait(
+                                device.getOwnerId(),
+                                device.getMac(),
+                                request.getInterval()
+                        );
 
-                return ResponseEntity.ok(device);
-            })
-            .orElse(ResponseEntity.notFound().build());
+                        if (!success) {
+                            return ResponseEntity.status(504).body("Urządzenie nie potwierdziło zmiany interwału (Offline?).");
+                        }
+
+                        device.setMeasurementInterval(request.getInterval());
+                    }
+
+                    if (request.getHolidayMode() != null) device.setHolidayMode(request.getHolidayMode());
+                    if (request.getSoilMin() != null) device.setSoilMin(request.getSoilMin());
+                    if (request.getSoilMax() != null) device.setSoilMax(request.getSoilMax());
+
+                    deviceRepository.save(device);
+
+                    return ResponseEntity.ok(device);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 }

@@ -29,11 +29,6 @@ const SettingsView = ({ deviceId, initialSettings, onSettingsSaved }: SettingsVi
     
     const handleSave = async () => {
         setLoading(true);
-        if (soilMin >= soilMax) {
-            alert("Próg minimalny musi być mniejszy od maksymalnego!");
-            setLoading(false);
-            return;
-        }
 
         try {
             const response = await api.put(`/devices/${deviceId}/settings`, {
@@ -43,11 +38,16 @@ const SettingsView = ({ deviceId, initialSettings, onSettingsSaved }: SettingsVi
                 soilMax: soilMax
             });
 
-            alert(`Konfiguracja zapisana!`);
+            alert(`Konfiguracja zapisana i potwierdzona przez urządzenie!`);
             onSettingsSaved(response.data); 
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert("Błąd zapisu ustawień.");
+            
+            if (error.response && error.response.status === 504) {
+                alert("Błąd: Nie udało się zmienić interwału - urządzenie nie odpowiada.");
+            } else {
+                alert("Błąd zapisu ustawień.");
+            }
         } finally {
             setLoading(false);
         }
@@ -106,17 +106,6 @@ const SettingsView = ({ deviceId, initialSettings, onSettingsSaved }: SettingsVi
 
                         <div className="mt-3">
                             <div className="row g-3">
-                                <div className="col-md-6">
-                                    <label className="form-label small text-muted fw-bold">Próg Suszy (Min %)</label>
-                                    <div className="input-group">
-                                        <input 
-                                            type="number" className="form-control" value={soilMin}
-                                            onChange={(e) => setSoilMin(parseInt(e.target.value))} 
-                                        />
-                                        <span className="input-group-text">%</span>
-                                    </div>
-                                    <div className="form-text small">Poniżej tej wartości system pozwoli podlać.</div>
-                                </div>
                                 <div className="col-md-6">
                                     <label className="form-label small text-muted fw-bold">Próg Stop (Max %)</label>
                                     <div className="input-group">

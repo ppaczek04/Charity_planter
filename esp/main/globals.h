@@ -12,6 +12,7 @@ extern uint32_t g_measurement_interval_ms;
 #define TOPIC_SUFFIX_TEMP         "temperature"
 #define TOPIC_SUFFIX_PRESS        "pressure"
 #define TOPIC_SUFFIX_COIN         "coin_inserted"
+#define TOPIC_SUFFIX_ACK          "water/ack"
 
 #define NVS_NS_SOIL       "soil_buf"
 #define NVS_NS_TEMP       "temp_buf"
