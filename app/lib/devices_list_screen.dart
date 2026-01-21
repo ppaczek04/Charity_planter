@@ -12,7 +12,7 @@ class DevicesListScreen extends StatefulWidget {
 }
 
 class _DevicesListScreenState extends State<DevicesListScreen> {
-  Future<List<Map<String, dynamic>>>? _devicesFuture;
+  Future<Map<String, List<Map<String, dynamic>>>>? _devicesFuture;
 
   @override
   void initState() {
@@ -20,7 +20,7 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
     _devicesFuture = _loadDevices();
   }
 
-  Future<List<Map<String, dynamic>>> _loadDevices() async {
+  Future<Map<String, List<Map<String, dynamic>>>> _loadDevices() async {
     final user = await ApiService.getCurrentUser();
     final userId = user?['id'] as String?;
 
@@ -31,10 +31,18 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
           (route) => false,
         );
       }
-      return [];
+      return {
+        'active': [],
+        'archived': [],
+      };
     }
 
-    return ApiService.getUserDevices(userId: userId);
+    final active = await ApiService.getUserDevices(userId: userId);
+    final archived = await ApiService.getUserArchivedDevices(userId: userId);
+    return {
+      'active': active,
+      'archived': archived,
+    };
   }
 
   @override
@@ -71,7 +79,7 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: FutureBuilder<List<Map<String, dynamic>>>(
+        child: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
           future: _devicesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -98,9 +106,11 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
               );
             }
 
-            final devices = snapshot.data ?? [];
+            final data = snapshot.data ?? {'active': [], 'archived': []};
+            final activeDevices = data['active'] ?? [];
+            final archivedDevices = data['archived'] ?? [];
 
-            if (devices.isEmpty) {
+            if (activeDevices.isEmpty && archivedDevices.isEmpty) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -132,23 +142,57 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
                 });
                 await _devicesFuture;
               },
-              child: ListView.builder(
-                itemCount: devices.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == devices.length) {
-                    return _buildAddDeviceButton();
-                  }
-
-                  final dev = devices[index];
-                  final name = (dev['name'] as String?)?.trim();
-                  final mac = (dev['mac'] as String?)?.trim();
-
-                  return _buildDeviceCard(
-                    device: dev,
-                    name: (name == null || name.isEmpty) ? 'Bez nazwy' : name,
-                    mac: mac ?? '-',
-                  );
-                },
+              child: ListView(
+                children: [
+                  if (activeDevices.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Aktywne urządzenia',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    ...activeDevices.map((dev) {
+                      final name = (dev['name'] as String?)?.trim();
+                      final mac = (dev['mac'] as String?)?.trim();
+                      return _buildDeviceCard(
+                        device: dev,
+                        name: (name == null || name.isEmpty) ? 'Bez nazwy' : name,
+                        mac: mac ?? '-',
+                        isArchived: false,
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                  ],
+                  if (archivedDevices.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Historia (sprzedane/przekazane)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    ...archivedDevices.map((dev) {
+                      final name = (dev['name'] as String?)?.trim();
+                      final mac = (dev['mac'] as String?)?.trim();
+                      return _buildDeviceCard(
+                        device: dev,
+                        name: (name == null || name.isEmpty) ? 'Bez nazwy' : name,
+                        mac: mac ?? '-',
+                        isArchived: true,
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                  ],
+                  _buildAddDeviceButton(),
+                ],
               ),
             );
           },
@@ -199,6 +243,7 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
     required Map<String, dynamic> device,
     required String name,
     required String mac,
+    required bool isArchived,
   }) {
     return Card(
       elevation: 2,
@@ -230,7 +275,7 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: isArchived ? Colors.grey.shade200 : Colors.green.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -256,6 +301,17 @@ class _DevicesListScreenState extends State<DevicesListScreen> {
                       'MAC: $mac',
                       style: const TextStyle(color: Colors.black54),
                     ),
+                    if (isArchived)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Urządzenie archiwalne — tylko podgląd pomiarów',
+                          style: TextStyle(
+                            color: Colors.black45,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

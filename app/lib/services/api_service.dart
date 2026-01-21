@@ -205,6 +205,38 @@ class ApiService {
     }
   }
 
+  /// Pobierz listę archiwalnych urządzeń użytkownika
+  /// Endpoint backendu: GET /api/devices/user/{userId}/archived
+  static Future<List<Map<String, dynamic>>> getUserArchivedDevices({
+    required String userId,
+  }) async {
+    try {
+      final response = await http
+          .get(
+            await _uri('/devices/user/$userId/archived'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded
+              .whereType<Map<String, dynamic>>()
+              .toList(growable: false);
+        }
+      }
+
+      print('Get archived devices error: ${response.statusCode} ${response.body}');
+      return [];
+    } catch (e) {
+      print('Get archived devices exception: $e');
+      throw Exception('Nie udało się pobrać archiwalnych urządzeń. ($e)');
+    }
+  }
+
   /// Zmień nazwę urządzenia
   /// Endpoint backendu: PUT /api/devices/{deviceId}
   static Future<void> renameDevice({

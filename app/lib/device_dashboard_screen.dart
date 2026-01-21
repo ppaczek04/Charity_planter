@@ -15,6 +15,7 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
   late String _deviceMac;
   late String _deviceOwnerId;
   late int _deviceId;
+  late bool _isArchived;
 
   int _selectedIndex = 0;
 
@@ -44,11 +45,17 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     final mac = (widget.device['mac'] as String?)?.trim();
     final ownerId = widget.device['ownerId'] as String?;
     final id = widget.device['id'] as int?;
+    final isArchived = widget.device['isArchived'] == true;
 
     _deviceName = (name == null || name.isEmpty) ? 'Bez nazwy' : name;
     _deviceMac = mac ?? '-';
     _deviceOwnerId = ownerId ?? '';
     _deviceId = id ?? 0;
+    _isArchived = isArchived;
+
+    if (_isArchived) {
+      _selectedIndex = 0;
+    }
 
     // Initialize draft values from saved state.
     _vacationModeDraft = _vacationMode;
@@ -721,6 +728,22 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     }
   }
 
+  Widget _archivedNotice() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Text(
+        'Urządzenie archiwalne — masz tylko podgląd pomiarów historycznych.',
+        style: TextStyle(color: Colors.black54),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -743,11 +766,12 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            onPressed: _editDeviceName,
-            icon: const Icon(Icons.edit),
-            tooltip: 'Zmień nazwę',
-          ),
+          if (!_isArchived)
+            IconButton(
+              onPressed: _editDeviceName,
+              icon: const Icon(Icons.edit),
+              tooltip: 'Zmień nazwę',
+            ),
         ],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -759,20 +783,27 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.query_stats),
-            label: 'Statystyki',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.water_drop),
-            label: 'Podlewanie',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Ustawienia',
-          ),
-        ],
+        items: _isArchived
+            ? const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.query_stats),
+                  label: 'Statystyki',
+                ),
+              ]
+            : const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.query_stats),
+                  label: 'Statystyki',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.water_drop),
+                  label: 'Podlewanie',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings),
+                  label: 'Ustawienia',
+                ),
+              ],
       ),
       body: SafeArea(
         child: Padding(
@@ -783,7 +814,13 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  child: _tabBody(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_isArchived) _archivedNotice(),
+                      _tabBody(),
+                    ],
+                  ),
                 ),
               ),
             ],
