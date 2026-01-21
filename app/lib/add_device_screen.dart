@@ -224,6 +224,7 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 	static const String _charMqtt16 = 'ff03';
 	static const String _charMac16 = 'ff06';
 	static const String _mqttBrokerUrl = 'mqtt://13.63.7.113';
+	static const String _charOwnerId = 'ff07';
 
 	static bool _guidMatches(Guid guid, String uuid16) {
 		final a = guid.toString().toLowerCase().replaceAll('-', '');
@@ -335,20 +336,28 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 			final ssidChar = _findChar(svc, _charSsid16);
 			final passChar = _findChar(svc, _charPass16);
 			final mqttChar = _findChar(svc, _charMqtt16);
+			final ownerChar = _findChar(svc, _charOwnerId);
 			if (ssidChar == null || passChar == null || mqttChar == null) {
 				throw Exception('Brak charakterystyk WiFi/MQTT (FF01/FF02/FF03).');
+			}
+
+			final user = await ApiService.getCurrentUser();
+			final userId = user?['id']?.toString();
+
+			if (userId == null || userId.isEmpty) {
+				throw Exception('Brak zalogowanego użytkownika.');
 			}
 
 			await ssidChar.write(utf8.encode(ssid), withoutResponse: false);
 			await passChar.write(utf8.encode(pass), withoutResponse: false);
 			await mqttChar.write(utf8.encode(_mqttBrokerUrl), withoutResponse: false);
 
-			final mac = await _readMac(svc);
-			final user = await ApiService.getCurrentUser();
-			final userId = user?['id']?.toString();
-			if (userId == null || userId.isEmpty) {
-				throw Exception('Brak zalogowanego użytkownika.');
+			if(ownerChar != null) {
+				setState(() => _status = 'Przypisywanie właściciela do urządzenia...');
+				await ownerChar.write(utf8.encode(userId), withoutResponse: false);
 			}
+
+			final mac = await _readMac(svc);
 
 			await ApiService.claimDevice(deviceMac: mac, userId: userId);
 
@@ -356,6 +365,7 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 			setState(() => _status = 'SUKCES! Urządzenie skonfigurowane.');
 			await Future.delayed(const Duration(seconds: 1));
 			if (mounted) Navigator.of(context).pop(true);
+
 		} catch (e) {
 			setState(() => _status = 'Błąd procesu: $e');
 		} finally {
