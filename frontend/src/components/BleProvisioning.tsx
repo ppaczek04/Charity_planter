@@ -9,6 +9,8 @@ const CHAR_URL_UUID = 0xFF03;
 const CHAR_MAC_UUID = 0xFF06;
 const CHAR_OWNER_UUID = 0xFF07;
 
+const HARDCODED_MQTT_URL = "mqtt://13.63.7.113";
+
 const BleProvisioning = () => {
     const navigate = useNavigate();
     
@@ -18,7 +20,8 @@ const BleProvisioning = () => {
     
     const [ssid, setSsid] = useState("");
     const [password, setPassword] = useState("");
-    const [mqttUrl, setMqttUrl] = useState("mqtt://"); 
+    
+    const [mqttUrl] = useState(HARDCODED_MQTT_URL); 
 
     const connectToDevice = async () => {
         try {
@@ -36,7 +39,7 @@ const BleProvisioning = () => {
             
             if (server) {
                 setIsConnected(true);
-                setStatus("Połączono! Wpisz dane WiFi i MQTT.");
+                setStatus("Połączono! Wpisz dane WiFi.");
             }
         } catch (error: any) {
             console.error(error);
@@ -58,6 +61,7 @@ const BleProvisioning = () => {
             const macChar = await service.getCharacteristic(CHAR_MAC_UUID);
             const macValue = await macChar.readValue();
             const decoder = new TextDecoder("utf-8");
+            
             const deviceMac = decoder.decode(macValue).replace(/\0/g, '').trim();
             console.log("Odczytano MAC:", deviceMac);
 
@@ -70,6 +74,7 @@ const BleProvisioning = () => {
             const passChar = await service.getCharacteristic(CHAR_PASS_UUID);
             await passChar.writeValue(encoder.encode(password));
 
+            // Wysyłamy stały URL (ukryty przed użytkownikiem)
             const urlChar = await service.getCharacteristic(CHAR_URL_UUID);
             await urlChar.writeValue(encoder.encode(mqttUrl));
 
@@ -146,22 +151,13 @@ const BleProvisioning = () => {
                                 placeholder="np. Domowe_WiFi"
                             />
                         </div>
-                        <div className="mb-3">
+                        <div className="mb-4">
                             <label className="form-label small text-muted">Hasło WiFi</label>
                             <input 
                                 type="password" 
                                 className="form-control" 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <label className="form-label small text-muted">Adres Brokera MQTT</label>
-                            <input 
-                                className="form-control" 
-                                placeholder="mqtt://..."
-                                value={mqttUrl} 
-                                onChange={e => setMqttUrl(e.target.value)} 
                             />
                         </div>
 
