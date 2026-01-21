@@ -368,25 +368,99 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                     itemBuilder: (_, i) {
                       final item = _statsData[i];
                       final timestamp = item['timestamp'] as String?;
-                      final value = item['value']?.toString() ?? '-';
-                      
+                      final rawValue = item['value'];
+
                       String displayTime = '-';
+                      String displayDate = '';
                       if (timestamp != null) {
                         try {
-                          final dt = DateTime.parse(timestamp);
-                          displayTime = '${dt.day}.${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+                          final dt = DateTime.parse(timestamp).toLocal();
+                          final h = dt.hour.toString().padLeft(2, '0');
+                          final m = dt.minute.toString().padLeft(2, '0');
+                          final s = dt.second.toString().padLeft(2, '0');
+                          final day = dt.day.toString().padLeft(2, '0');
+                          final mon = dt.month.toString().padLeft(2, '0');
+                          displayTime = '$h:$m:$s';
+                          displayDate = '$day.$mon.${dt.year}';
                         } catch (_) {}
                       }
-                      
+
+                      String unit = '';
+                      IconData icon = Icons.analytics;
+                      switch (_selectedStatsTab) {
+                        case 0:
+                          unit = '°C';
+                          icon = Icons.thermostat;
+                          break;
+                        case 1:
+                          unit = 'hPa';
+                          icon = Icons.speed;
+                          break;
+                        case 2:
+                          unit = '%';
+                          icon = Icons.water_drop;
+                          break;
+                        case 3:
+                          unit = 'PLN';
+                          icon = Icons.attach_money;
+                          break;
+                      }
+
+                      String valueText = '-';
+                      if (rawValue is num) {
+                        valueText = rawValue.toStringAsFixed(2);
+                      } else if (rawValue != null) {
+                        valueText = rawValue.toString();
+                      }
+
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Row(
                           children: [
-                            Expanded(child: Text(displayTime)),
                             Expanded(
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(value),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayTime,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  if (displayDate.isNotEmpty)
+                                    Text(
+                                      displayDate,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.black12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(icon, size: 16, color: Colors.black87),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '$valueText $unit',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
