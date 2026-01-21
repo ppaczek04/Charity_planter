@@ -223,6 +223,7 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 	static const String _charPass16 = 'ff02';
 	static const String _charMqtt16 = 'ff03';
 	static const String _charMac16 = 'ff06';
+	static const String _mqttBrokerUrl = 'mqtt://13.63.7.113';
 
 	static bool _guidMatches(Guid guid, String uuid16) {
 		final a = guid.toString().toLowerCase().replaceAll('-', '');
@@ -241,7 +242,6 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 
 	final _ssidController = TextEditingController();
 	final _passwordController = TextEditingController();
-	final _mqttController = TextEditingController(text: 'mqtt://');
 
 	@override
 	void initState() {
@@ -254,7 +254,6 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 		_disconnect();
 		_ssidController.dispose();
 		_passwordController.dispose();
-		_mqttController.dispose();
 		super.dispose();
 	}
 
@@ -279,7 +278,7 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 
 			setState(() {
 				_service = svc;
-				_status = 'Połączono! Wpisz dane WiFi i MQTT.';
+				_status = 'Połączono! Wpisz dane WiFi.';
 			});
 		} catch (e) {
 			setState(() => _status = 'Błąd połączenia: $e');
@@ -321,10 +320,9 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 
 		final ssid = _ssidController.text.trim();
 		final pass = _passwordController.text;
-		final mqtt = _mqttController.text.trim();
 
-		if (ssid.isEmpty || mqtt.isEmpty) {
-			setState(() => _status = 'SSID i adres MQTT są wymagane.');
+		if (ssid.isEmpty) {
+			setState(() => _status = 'SSID jest wymagane.');
 			return;
 		}
 
@@ -343,7 +341,7 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 
 			await ssidChar.write(utf8.encode(ssid), withoutResponse: false);
 			await passChar.write(utf8.encode(pass), withoutResponse: false);
-			await mqttChar.write(utf8.encode(mqtt), withoutResponse: false);
+			await mqttChar.write(utf8.encode(_mqttBrokerUrl), withoutResponse: false);
 
 			final mac = await _readMac(svc);
 			final user = await ApiService.getCurrentUser();
@@ -428,16 +426,6 @@ class _AddDeviceFormScreenState extends State<AddDeviceFormScreen> {
 												obscureText: true,
 												decoration: const InputDecoration(
 													labelText: 'Hasło WiFi',
-													border: OutlineInputBorder(),
-												),
-											),
-											const SizedBox(height: 12),
-											TextField(
-												controller: _mqttController,
-												enabled: connected && !_isSending,
-												decoration: const InputDecoration(
-													labelText: 'Adres brokera MQTT',
-													hintText: 'mqtt://192.168.0.116:1883',
 													border: OutlineInputBorder(),
 												),
 											),
