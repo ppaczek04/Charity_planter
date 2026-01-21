@@ -33,8 +33,6 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
       TextEditingController(text: '1');
   final TextEditingController _measurementIntervalSecondsController =
       TextEditingController(text: '5');
-  final TextEditingController _dryThresholdController =
-      TextEditingController(text: '30');
   final TextEditingController _stopThresholdController =
       TextEditingController(text: '70');
 
@@ -55,7 +53,6 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     // Initialize draft values from saved state.
     _vacationModeDraft = _vacationMode;
     _measurementIntervalSecondsController.text = '5';
-    _dryThresholdController.text = '30';
     _stopThresholdController.text = '70';
     
     // Load measurements on init
@@ -66,7 +63,6 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
   void dispose() {
     _manualWaterSecondsController.dispose();
     _measurementIntervalSecondsController.dispose();
-    _dryThresholdController.dispose();
     _stopThresholdController.dispose();
     super.dispose();
   }
@@ -121,15 +117,7 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
 
   Future<void> _saveSettings() async {
     final interval = int.tryParse(_measurementIntervalSecondsController.text) ?? 5;
-    final soilMin = int.tryParse(_dryThresholdController.text) ?? 30;
     final soilMax = int.tryParse(_stopThresholdController.text) ?? 70;
-    
-    if (soilMin >= soilMax) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Próg minimalny musi być mniejszy od maksymalnego!')),
-      );
-      return;
-    }
 
     setState(() => _isSavingSettings = true);
     try {
@@ -137,7 +125,6 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
         deviceId: _deviceId,
         interval: interval,
         holidayMode: _vacationModeDraft,
-        soilMin: soilMin,
         soilMax: soilMax,
       );
       
@@ -150,9 +137,18 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd zapisu: $e')),
-        );
+        final message = e.toString();
+        if (message.contains('504')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Urządzenie nie potwierdziło zmiany interwału (Offline).'),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Błąd zapisu: $e')),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isSavingSettings = false);
@@ -164,21 +160,43 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     
     setState(() => _isWatering = true);
     try {
-      await ApiService.waterDevice(
+      final responseMessage = await ApiService.waterDevice(
         deviceId: _deviceId,
         duration: duration,
       );
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Podlano roślinę!')),
-        );
+        final normalized = responseMessage.toLowerCase();
+        if (normalized.contains('potwierdzone')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Podlano roślinę!')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                responseMessage.isEmpty
+                    ? 'Komenda wysłana, brak potwierdzenia urządzenia.'
+                    : responseMessage,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd podlewania: $e')),
-        );
+        final message = e.toString();
+        if (message.contains('504')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Urządzenie nie odpowiada (Offline).'),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Błąd podlewania: $e')),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isWatering = false);
@@ -222,13 +240,23 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
     final trimmed = result?.trim();
     if (trimmed == null || trimmed.isEmpty) return;
 
-    setState(() {
-      _deviceName = trimmed;
-    });
+    try {
+      await ApiService.renameDevice(deviceId: _deviceId, newName: trimmed);
+      if (!mounted) return;
+      setState(() {
+        _deviceName = trimmed;
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Zmieniono nazwę (placeholder).')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Zmieniono nazwę doniczki.')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Nie udało się zmienić nazwy: $e')),
+        );
+      }
+    }
   }
 
   Widget _statsTab() {
@@ -560,24 +588,8 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Definiują strefy "za sucho" i "za mokro".',
+                  'Definiują strefę "za mokro".',
                   style: TextStyle(color: Colors.black54),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _dryThresholdController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Próg suszy (min %)',
-                          border: OutlineInputBorder(),
-                          suffixText: '%',
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 12),
                 Row(

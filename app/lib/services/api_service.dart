@@ -205,6 +205,35 @@ class ApiService {
     }
   }
 
+  /// Zmień nazwę urządzenia
+  /// Endpoint backendu: PUT /api/devices/{deviceId}
+  static Future<void> renameDevice({
+    required int deviceId,
+    required String newName,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            await _uri('/devices/$deviceId'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'newName': newName.trim(),
+            }),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      }
+
+      throw Exception('Błąd zmiany nazwy: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      throw Exception('Nie udało się zmienić nazwy. ($e)');
+    }
+  }
+
   /// Pobierz pomiary temperatury z ostatnich 24h
   /// Endpoint backendu: GET /api/temperatures
   static Future<List<Map<String, dynamic>>> getTemperatures({
@@ -391,7 +420,7 @@ class ApiService {
 
   /// Wyślij komendę podlewania
   /// Endpoint backendu: POST /api/devices/{deviceId}/water
-  static Future<void> waterDevice({
+  static Future<String> waterDevice({
     required int deviceId,
     required double duration,
   }) async {
@@ -406,9 +435,15 @@ class ApiService {
           )
           .timeout(_requestTimeout);
 
+      if (response.statusCode == 504) {
+        throw Exception('504: ${response.body}');
+      }
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('Błąd podlewania: ${response.body}');
       }
+
+      return response.body.toString();
     } catch (e) {
       throw Exception('Nie udało się wysłać komendy podlewania. ($e)');
     }
@@ -420,7 +455,6 @@ class ApiService {
     required int deviceId,
     required int interval,
     required bool holidayMode,
-    required int soilMin,
     required int soilMax,
   }) async {
     try {
@@ -433,11 +467,14 @@ class ApiService {
             body: jsonEncode({
               'interval': interval,
               'holidayMode': holidayMode,
-              'soilMin': soilMin,
               'soilMax': soilMax,
             }),
           )
           .timeout(_requestTimeout);
+
+      if (response.statusCode == 504) {
+        throw Exception('504: ${response.body}');
+      }
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('Błąd aktualizacji ustawień: ${response.body}');
