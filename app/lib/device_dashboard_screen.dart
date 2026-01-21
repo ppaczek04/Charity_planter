@@ -780,17 +780,12 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
           },
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
-        items: _isArchived
-            ? const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.query_stats),
-                  label: 'Statystyki',
-                ),
-              ]
-            : const [
+      bottomNavigationBar: _isArchived
+          ? null 
+          : BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (i) => setState(() => _selectedIndex = i),
+              items: const [
                 BottomNavigationBarItem(
                   icon: Icon(Icons.query_stats),
                   label: 'Statystyki',
@@ -804,7 +799,7 @@ class _DeviceDashboardScreenState extends State<DeviceDashboardScreen> {
                   label: 'Ustawienia',
                 ),
               ],
-      ),
+            ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
